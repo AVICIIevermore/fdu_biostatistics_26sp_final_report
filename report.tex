@@ -23,23 +23,17 @@
   urlcolor=blue
 }
 
-\title{\textbf{Mahalanobis MMD for Biomedical Two-Sample Testing: Review and Representation Experiments}}
+\title{\textbf{Reboosting the Power of Kernel Two-Sample Tests: Reveiew and Extensions based on MMMD Strategy}}
 \author{
-  [Name 1, Fudan ID] \and
-  [Name 2, Fudan ID] \and
-  [Name 3, Fudan ID] \and
-  [Name 4, Fudan ID]
+  [Dechao Huang 23300660009] \and
+  [Ruijie Li] \and
+  [Ziheng Zheng] \and
+  [Yao Yu 23300660008]
 }
 \date{June 2026}
 
 \begin{document}
 \maketitle
-
-\noindent\textbf{Contribution statement.}
-[Worker 1]: [to be filled].
-[Worker 2]: [to be filled].
-[Worker 3]: [to be filled].
-Representation experiments: MMMD experiments on BloodMNIST, PathMNIST, and NCT-CRC; CLIP, DINOv2, raw-pixel, CNN, and NEW-MMMD comparisons; experimental figures and result summaries.
 
 \begin{abstract}
 Two-sample testing asks whether two independent samples come from the same distribution. In biostatistics, such differences often involve mixture composition, covariance, morphology, sparsity, or tail behavior rather than a simple mean shift. The paper reviewed in this project studies Mahalanobis aggregated maximum mean discrepancy (MMMD), which combines several kernel MMD statistics through an estimated covariance matrix instead of relying on a single bandwidth. This report reviews the motivation and related literature for kernel two-sample tests, reserves separate sections for the original method, data review, and other group experiments, and presents our representation-level extension on biomedical images. In the representation component, we compare raw pixels, CLIP, DINOv2, and task-trained CNN features on BloodMNIST, PathMNIST, and NCT-CRC. The main empirical finding is that MMMD power is shaped strongly by the representation space: raw pixels are usually sample inefficient, DINOv2 is stronger than CLIP on pathology-style images, a task-trained CNN is most robust on BloodMNIST, and NEW-MMMD improves calibration and covariance conditioning more consistently than it improves power.
