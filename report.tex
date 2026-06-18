@@ -1,0 +1,344 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{setspace}
+\linespread{1.1}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{caption}
+\captionsetup{justification=centering,singlelinecheck=false}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=black,
+  urlcolor=blue
+}
+
+\title{\textbf{Mahalanobis MMD for Biomedical Two-Sample Testing: Review and Representation Experiments}}
+\author{
+  [Name 1, Fudan ID] \and
+  [Name 2, Fudan ID] \and
+  [Name 3, Fudan ID] \and
+  [Name 4, Fudan ID]
+}
+\date{June 2026}
+
+\begin{document}
+\maketitle
+
+\noindent\textbf{Contribution statement.}
+[Worker 1]: [to be filled].
+[Worker 2]: [to be filled].
+[Worker 3]: [to be filled].
+Representation experiments: MMMD experiments on BloodMNIST, PathMNIST, and NCT-CRC; CLIP, DINOv2, raw-pixel, CNN, and NEW-MMMD comparisons; experimental figures and result summaries.
+
+\begin{abstract}
+Two-sample testing asks whether two independent samples come from the same distribution. In biostatistics, such differences often involve mixture composition, covariance, morphology, sparsity, or tail behavior rather than a simple mean shift. The paper reviewed in this project studies Mahalanobis aggregated maximum mean discrepancy (MMMD), which combines several kernel MMD statistics through an estimated covariance matrix instead of relying on a single bandwidth. This report reviews the motivation and related literature for kernel two-sample tests, reserves separate sections for the original method, data review, and other group experiments, and presents our representation-level extension on biomedical images. In the representation component, we compare raw pixels, CLIP, DINOv2, and task-trained CNN features on BloodMNIST, PathMNIST, and NCT-CRC. The main empirical finding is that MMMD power is shaped strongly by the representation space: raw pixels are usually sample inefficient, DINOv2 is stronger than CLIP on pathology-style images, a task-trained CNN is most robust on BloodMNIST, and NEW-MMMD improves calibration and covariance conditioning more consistently than it improves power.
+\end{abstract}
+
+\section{Background, motivation, and related work}
+
+The two-sample problem tests whether two samples are drawn from the same distribution. Let \(P\) and \(Q\) be two probability distributions on a sample space \(\mathcal{X}\), and suppose we observe independent samples
+\[
+\mathcal{X}_m=\{X_1,\ldots,X_m\}\sim P,\qquad
+\mathcal{Y}_n=\{Y_1,\ldots,Y_n\}\sim Q.
+\]
+The hypotheses are
+\[
+H_0:P=Q,\qquad H_1:P\ne Q.
+\]
+This problem is common in biomedical studies because group differences can be multivariate and structured. In gene expression, microbiome profiles, single-cell measurements, and biomedical images, the difference between two populations may appear as a change in mixture composition, covariance, morphology, or a small subpopulation. A useful test should therefore be nonparametric, valid under the null, and sensitive to alternatives that are hard to specify in advance.
+
+Classical one-dimensional tests such as Wilcoxon, Wald-Wolfowitz, and Kolmogorov-Smirnov are interpretable, but they are mainly designed for ordered observations. Graph-based and distance-based methods extend two-sample testing to multivariate data through constructions such as minimum-spanning-tree tests and energy-distance statistics \cite{friedman1979,sejdinovic2013}. These methods can work well when the distance captures the scientific difference, but distance geometry can become unreliable in high-dimensional or noisy settings, especially when nuisance variation dominates the signal.
+
+Kernel two-sample tests based on maximum mean discrepancy (MMD) give a flexible way to compare distributions. MMD compares the mean embeddings of \(P\) and \(Q\) in a reproducing kernel Hilbert space. With characteristic kernels, population MMD is zero exactly when \(P=Q\) \cite{gretton2012}. The practical difficulty is bandwidth choice. The median heuristic is convenient, but finite-sample power can change sharply with the kernel and its scale. This issue is especially visible in biomedical image tasks because the same biological difference may look small or large depending on whether the observations are represented as raw pixels, CNN features, or pretrained foundation-model embeddings.
+
+Recent work improves kernel two-sample testing in two main ways. One line learns or selects kernels to increase power, but selection can disturb Type-I error control if the same data are used for tuning and testing; data splitting avoids that problem but spends samples on selection \cite{liu2020}. Another line aggregates multiple kernels, such as MMDAgg, to reduce dependence on a single bandwidth \cite{schrab2023}. Chatterjee and Bhattacharya's MMMD follows the aggregation idea but uses the covariance structure among multiple MMD estimates \cite{chatterjee2025}. Instead of asking which bandwidth is best, MMMD asks how to combine several correlated kernel discrepancies into one calibrated statistic.
+
+Our experiments add a representation-level question. When the observations are images, how much of the two-sample power comes from the test statistic, and how much comes from the representation? We keep the testing layer fixed when possible and vary the representation across raw pixels, CLIP, DINOv2, and task-trained CNN features. This separation matters because poor image geometry can make a good kernel test look weak, while a good embedding can make a biologically meaningful difference easier for MMMD to detect.
+
+\section{Proposed method in the reviewed paper (to be completed)}
+
+\textit{This section is reserved for another worker.}
+
+Suggested content:
+\begin{itemize}
+  \item Explain the original paper's test statistic and how Mahalanobis aggregation combines multiple MMD estimates.
+  \item Describe the covariance estimator, calibration procedure, and rejection rule.
+  \item Compare the method with single-kernel MMD, MMDAgg, data-splitting kernel learning, and graph or distance tests.
+  \item Discuss advantages and limitations, including bandwidth robustness, covariance estimation, computation, and possible small-sample instability.
+\end{itemize}
+
+\section{Data and real application in the reviewed paper (to be completed)}
+
+\textit{This section is reserved for another worker.}
+
+Suggested content:
+\begin{itemize}
+  \item Identify the real data application used in the paper, if any.
+  \item State whether the original data are accessible.
+  \item If the original data are not accessible, explain the alternative datasets used by the group.
+  \item Clarify which results are reproduced from the paper and which are our own extensions.
+\end{itemize}
+
+\section{Other numerical results (to be completed)}
+
+\textit{This section is reserved for another worker.}
+
+Suggested content:
+\begin{itemize}
+  \item Add simulations or reproductions outside the representation-experiment folder.
+  \item Report the experimental protocol, parameter settings, baselines, and numerical results.
+  \item Use separate tables for power and Type-I error.
+  \item Make clear whether each result is a reproduction, a simplified pedagogical example, or a new extension.
+\end{itemize}
+
+\section{Representation-assisted MMMD experiments}
+
+This section studies whether the feature space used before testing changes the behavior of MMMD-style two-sample tests. Most comparisons keep the testing layer fixed, so differences in power mainly reflect differences in representation rather than changes in the statistic itself.
+
+\subsection{From CNN features to foundation encoders}
+
+The starting point is the CNN-MMMD pipeline: train a small CNN, extract feature vectors, and run MMMD on the resulting feature matrices. This works well when labels are available, but it also makes the test depend on a dataset-specific training step. A natural alternative is to use frozen visual encoders that already contain broad image structure.
+
+We therefore compare raw pixels, task-trained CNN features, CLIP embeddings, and DINOv2 embeddings. CLIP provides an image-text contrastive representation, while DINOv2 provides a self-supervised visual representation that is often more sensitive to texture and morphology. In all cases, the two-sample test is applied after feature extraction; the encoders are not tuned on the test samples.
+
+\subsection{Experimental protocol}
+
+We report empirical power under mixture alternatives and empirical Type-I error under matched null settings. The experiments use three biomedical image benchmarks and four focused comparisons: BloodMNIST noise robustness, PathMNIST alignment with task-trained CNN baselines, NCT-CRC sample-size scaling, and a NCT-CRC testing-layer comparison between GEXP-5 and NEW-MMMD. Dataset descriptions, mixture definitions, and implementation paths are given in Appendix~\ref{app:repr}.
+
+\subsection{BloodMNIST noise robustness}
+
+The BloodMNIST experiment asks which representation survives additive image noise. Under the mixed task \((0,1,3)\) versus \((0,1,6)\), the task-trained CNN keeps power above \(0.91\) even at \(\sigma=1\), while CLIP and DINOv2 drop more sharply under heavy noise. Raw pixels are weaker at low and moderate noise, although they do not collapse as much at the largest noise level. Matched-null Type-I error stays close to nominal for the frozen encoders and is generally conservative for raw pixels and CNN features, so the power differences are not explained by uncontrolled false positives.
+
+\subsection{PathMNIST alignment with task-trained CNNs}
+
+The PathMNIST experiment asks whether frozen encoders can replace a task-trained CNN on small pathology patches. DINOv2 improves rapidly with sample size, rising from power \(0.0534\) at \(n=30\) to \(0.9904\) at \(n=150\), but small samples still favor the trained CNN baselines from the reproduction pipeline. CLIP improves more slowly, reaching power \(0.7172\) at \(n=150\). The matched-null runs are also conservative for DINOv2, with rejection rates about \(0.0038\) at \(n=60\) and \(0.0034\) at \(n=120\). For very small \(28\times 28\) pathology patches, a small CNN trained on the target distribution can still be better matched to the data than a frozen natural-image encoder.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/bloodmnist_mixed_raw_clip_dino_cnn_gauss5.png}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/pathmnist_sample_size_vs_cnn.png}
+\end{minipage}
+\caption{BloodMNIST and PathMNIST representation experiments.}
+\label{fig:blood-path-main}
+\end{figure}
+
+\subsection{NCT-CRC sample-size scaling}
+
+The NCT-CRC experiment shows how representation rankings can change with sample size. CNN features are competitive at small and medium \(n\), but DINOv2 becomes strongest once \(n\) is large enough. At \(n=150\), power is \(0.300\) for raw pixels, \(0.750\) for CLIP, \(0.875\) for CNN features, and \(0.988\) for DINOv2. This pattern suggests that DINOv2 features capture tissue architecture that raw pixels and CLIP do not capture as efficiently.
+
+\subsection{Testing-layer stabilization with NEW-MMMD}
+
+The final experiment separates the representation layer from the testing layer. With NCT-CRC representations fixed, GEXP-5 is compared with NEW-MMMD, which stabilizes covariance estimation and prunes redundant kernels. On DINOv2 features, NEW-MMMD is conservative at very small sample size but catches up by \(n=120\) and \(n=150\). Its clearest benefit is numerical: the raw covariance condition numbers for GEXP-5 are often on the order of \(10^6\) to \(10^7\), while the regularized NEW-MMMD condition numbers are much smaller after stabilization and pruning.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/nctcrc_sample_size_comparison.png}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/nctcrc_lrj_all_representations.png}
+\end{minipage}
+\caption{NCT-CRC representation and testing-layer experiments.}
+\label{fig:nct-newmmmd-main}
+\end{figure}
+
+\subsection{Overall insights and limitations}
+
+The main insight is that representation is part of the statistical design. Raw pixels leave the kernel test to work directly in a high-dimensional noisy space. Frozen encoders often help, especially DINOv2 on pathology-style images, but they are not uniformly best. A task-trained CNN can be strongest when labels are available and the target morphology is narrow enough for a simple supervised feature extractor to learn. NEW-MMMD improves calibration and matrix conditioning, but its power gains depend on sample size and representation.
+
+These experiments are still limited by computational resources and time. The main goal is to examine whether foundation encoders, used as a representation layer, can substantially change the performance of two-sample testing. Therefore, the current study focuses on several representative feature spaces, including CLIP, DINOv2, raw pixels, and CNN features. Many directions remain open. Future work could compare more foundation models with different scales and training objectives, repeat the experiments on more medical image datasets, and test more class combinations, noise levels, and domain-shift settings. In addition, most encoders are currently frozen; fine-tuning or domain adaptation may further improve the power of MMMD-style tests.
+
+\clearpage
+\appendix
+\section{Detailed representation experiment tables and figures}
+\label{app:repr}
+
+\subsection{Datasets, tasks, and implementation details}
+
+The representation experiments use three biomedical image datasets. BloodMNIST-224 contains 17,092 blood-cell images and is used for noise robustness and sample-size studies. PathMNIST-28 contains 107,180 small pathology patches and is used to compare frozen encoders with task-trained CNN baselines from the reproduction pipeline. NCT-CRC contains 100,000 H\&E patches and is used for larger pathology-image sample-size experiments and for the NEW-MMMD testing-layer comparison.
+
+The BloodMNIST mixed alternative compares class-balanced mixtures \((0,1,3)\) and \((0,1,6)\), so the two populations share labels 0 and 1 and differ through labels 3 versus 6. The PathMNIST experiment follows the reproduction-aligned overlapping-mixture setting. The NCT-CRC alternative compares \((\mathrm{NORM}, \mathrm{STR}, \mathrm{LYM})\) with \((\mathrm{TUM}, \mathrm{STR}, \mathrm{LYM})\). These settings are harder than direct binary class tests because only part of the mixture changes.
+
+The implementation used for this section is organized under \path{code/Biostatistics_fdu_26/yao}. The shared R testing functions are in \path{code/Biostatistics_fdu_26/yao/src/mmmd_functions.R}, and the slide-based experiment narrative is stored under \path{representation_final_package}. Most representation comparisons use GAUSS5; the NEW-MMMD experiment is the main exception because it explicitly changes the testing layer.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.88\textwidth]{figures/foundation_dataset_examples.png}
+\caption{Biomedical image datasets used in the representation experiments.}
+\label{fig:dataset-examples}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{BloodMNIST mixed task power at endpoint noise levels.}
+\label{tab:blood-endpoints}
+\begin{tabular}{lcc}
+\toprule
+Representation & Power at \(\sigma=0\) & Power at \(\sigma=1\) \\
+\midrule
+Raw pixels & 0.676 & 0.515 \\
+CLIP & 0.980 & 0.315 \\
+DINOv2 & 0.922 & 0.429 \\
+CNN final FC-128 & 0.993 & 0.917 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.74\textwidth]{figures/bloodmnist_mixed_raw_clip_dino_cnn_gauss5.png}
+\caption{BloodMNIST mixed-task representation comparison.}
+\label{fig:blood-repr}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{BloodMNIST sample-size sweep at fixed \(\sigma=0.6\).}
+\label{tab:blood-sample-size}
+\begin{tabular}{rrrr}
+\toprule
+Sample size & Raw pixels & CLIP & DINOv2 \\
+\midrule
+30 & 0.0625 & 0.5000 & 0.5125 \\
+60 & 0.4125 & 0.7750 & 0.8875 \\
+90 & 0.7125 & 0.8875 & 0.9625 \\
+120 & 0.8875 & 0.9625 & 1.0000 \\
+150 & 0.9875 & 1.0000 & 1.0000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.74\textwidth]{figures/bloodmnist_mixed_sample_size_comparison.png}
+\caption{BloodMNIST sample-size comparison at \(\sigma=0.6\).}
+\label{fig:blood-sample}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{PathMNIST frozen-encoder power in the reproduction-aligned overlapping-mixture setting.}
+\label{tab:pathmnist}
+\begin{tabular}{rrr}
+\toprule
+Sample size & CLIP & DINOv2 \\
+\midrule
+30 & 0.1166 & 0.0534 \\
+60 & 0.1760 & 0.2506 \\
+90 & 0.3232 & 0.5926 \\
+120 & 0.5152 & 0.8900 \\
+150 & 0.7172 & 0.9904 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.74\textwidth]{figures/pathmnist_sample_size_vs_cnn.png}
+\caption{PathMNIST frozen encoders compared with trained-CNN baselines.}
+\label{fig:pathmnist}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{NCT-CRC representation comparison on \((\mathrm{NORM},\mathrm{STR},\mathrm{LYM})\) versus \((\mathrm{TUM},\mathrm{STR},\mathrm{LYM})\).}
+\label{tab:nct}
+\begin{tabular}{rrrrr}
+\toprule
+Sample size & Raw pixels & CLIP & CNN & DINOv2 \\
+\midrule
+30 & 0.125 & 0.013 & 0.100 & 0.038 \\
+60 & 0.113 & 0.063 & 0.288 & 0.188 \\
+90 & 0.175 & 0.200 & 0.575 & 0.475 \\
+120 & 0.238 & 0.500 & 0.738 & 0.875 \\
+150 & 0.300 & 0.750 & 0.875 & 0.988 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.74\textwidth]{figures/nctcrc_sample_size_comparison.png}
+\caption{NCT-CRC representation comparison across sample sizes.}
+\label{fig:nct}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{NCT-CRC DINOv2 testing-layer comparison.}
+\label{tab:new-mmmd}
+\begin{tabular}{rrr}
+\toprule
+Sample size & GEXP-5 power & NEW-MMMD power \\
+\midrule
+30 & 0.1000 & 0.0125 \\
+60 & 0.1875 & 0.1500 \\
+90 & 0.5625 & 0.5375 \\
+120 & 0.9000 & 0.9125 \\
+150 & 0.9625 & 0.9750 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.74\textwidth]{figures/nctcrc_lrj_all_representations.png}
+\caption{NEW-MMMD and GEXP-5 comparison across NCT-CRC representations.}
+\label{fig:newmmmd}
+\end{figure}
+
+\begin{thebibliography}{9}
+
+\bibitem{banerjee2019}
+Banerjee, S., et al. (2019).
+Adaptive multivariate two-sample testing for microbiome differential abundance.
+
+\bibitem{chatterjee2025}
+Chatterjee, D. and Bhattacharya, B. B. (2025).
+Mahalanobis maximum mean discrepancy for boosting the power of kernel two-sample tests.
+
+\bibitem{friedman1979}
+Friedman, J. H. and Rafsky, L. C. (1979).
+Multivariate generalizations of the Wald-Wolfowitz and Smirnov two-sample tests.
+
+\bibitem{gretton2012}
+Gretton, A., Borgwardt, K. M., Rasch, M. J., Schoelkopf, B., and Smola, A. (2012).
+A kernel two-sample test.
+
+\bibitem{liu2020}
+Liu, F., Xu, W., Lu, J., Zhang, G., Gretton, A., and Sutherland, D. J. (2020).
+Learning deep kernels for non-parametric two-sample tests.
+
+\bibitem{ramdas2015}
+Ramdas, A., Reddi, S. J., Poczos, B., Singh, A., and Wasserman, L. (2015).
+On the decreasing power of kernel and distance based nonparametric hypothesis tests in high dimensions.
+
+\bibitem{schrab2023}
+Schrab, A., Kim, I., Albert, M., Laurent, B., Guedj, B., and Gretton, A. (2023).
+MMD aggregated two-sample test.
+
+\bibitem{sejdinovic2013}
+Sejdinovic, D., Sriperumbudur, B., Gretton, A., and Fukumizu, K. (2013).
+Equivalence of distance-based and RKHS-based statistics in hypothesis testing.
+
+\end{thebibliography}
+
+\end{document}
