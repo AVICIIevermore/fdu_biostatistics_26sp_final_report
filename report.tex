@@ -5,6 +5,8 @@
 \geometry{margin=1in}
 \usepackage{setspace}
 \linespread{1.1}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5ex plus 0.2ex minus 0.1ex}
 \usepackage{lmodern}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
@@ -82,9 +84,9 @@ All experiments use synthetic data with $d=30$, AR(1) covariance ($\rho=0.5$), s
 
 \subsection{Sensitivity to contamination and variance change}
 
-\textbf{Contamination.} Let $P=\mathcal{N}(0,\Sigma)$ and $Q=(1-\varepsilon)\mathcal{N}(0,\Sigma)+\varepsilon\cdot t_{10}(0,\Sigma)$. Using GEXP with $r=5$, the minimum contamination fraction detectable at power 0.80 is $\varepsilon_{\min}=0.625$. Power rises steeply in $\varepsilon\in[0.45,0.65]$ from 0.57 to 0.80, while below 0.45 the heavy-tailed component is too dilute to separate (see Figure~\ref{fig:eps-sensitivity} in the appendix).
+We've conducted two experiments to test out the sensitivity of MMMD test. The first one is \textbf{contamination}. Let $P=\mathcal{N}(0,\Sigma)$ and $Q=(1-\varepsilon)\mathcal{N}(0,\Sigma)+\varepsilon\cdot t_{10}(0,\Sigma)$. Using GEXP with $r=5$, the minimum contamination fraction detectable at power 0.80 is $\varepsilon_{\min}=0.625$. Power rises steeply in $\varepsilon\in[0.45,0.65]$ from 0.57 to 0.80, while below 0.45 the heavy-tailed component is too dilute to separate (see Figure~\ref{fig:eps-sensitivity} in the appendix).
 
-\textbf{Variance scale.} Let $P=\mathcal{N}(0,\Sigma_0)$ and $Q=\mathcal{N}(0,k\cdot\Sigma_0)$ with $k>1$. All three MMMD variants detect $k_{\min}=1.25$ at power $\geq 0.80$; single-kernel Gaussian MMD requires $k_{\min}=1.40$. At a 20\% covariance increase ($k=1.20$), MMMD power is 0.71--0.79 versus 0.18 for the single-kernel baseline --- roughly a four-fold gap (see Figure~\ref{fig:var-sensitivity} and Table~\ref{tab:var-sensitivity}).
+The second is \textbf{variance scale.} Let $P=\mathcal{N}(0,\Sigma_0)$ and $Q=\mathcal{N}(0,k\cdot\Sigma_0)$ with $k>1$. All three MMMD variants detect $k_{\min}=1.25$ at power $\geq 0.80$; single-kernel Gaussian MMD requires $k_{\min}=1.40$. At a 20\% covariance increase ($k=1.20$), MMMD power is 0.71--0.79 versus 0.18 for the single-kernel baseline --- roughly a four-fold gap (see Figure~\ref{fig:var-sensitivity} and Table~\ref{tab:var-sensitivity}).
 
 \subsection{Type-I error calibration and ROC analysis}
 
@@ -324,7 +326,13 @@ Sample size & GEXP-5 power & NEW-MMMD power \\
 \section{MMMD numerical extension: detailed figures and tables}
 \label{app:numext}
 
-All experiments use $d=30$, AR(1) covariance with $\rho=0.5$, multiplier bootstrap with $B=500$, and $N_{\text{trials}}=150$--$200$ unless noted otherwise. The R implementation uses a modular structure with parallel backend support.
+All experiments in this section use synthetic data with dimension $d=30$, AR(1) covariance structure ($\rho=0.5$), and sample size $n=100$ unless noted otherwise. The testing layer uses the paper's multiplier bootstrap with $B=500$ draws per test and $N=150$--$200$ independent Monte Carlo trials per experimental condition. Three kernel families are examined: GEXP (Gaussian kernel with an exponential bandwidth grid), LAP (Laplace kernel with the same grid structure), and MIXED (concatenated Gaussian and Laplace kernels). The R implementation is organized as a modular library with a parallel backend for Monte Carlo replication.
+
+\subsection{Contamination sensitivity}
+
+Figure~\ref{fig:eps-sensitivity} shows how MMMD power varies with the heavy-tailed contamination fraction $\varepsilon$ under $P=\mathcal{N}(0,\Sigma)$ and $Q=(1-\varepsilon)\mathcal{N}(0,\Sigma)+\varepsilon\cdot t_{10}(0,\Sigma)$. When $\varepsilon=0$, the two populations are identical and rejection rates stay near the nominal level. As $\varepsilon$ increases from 0 to 1, the proportion of $t_{10}$ draws in $Q$ grows, and the distributional discrepancy becomes easier to detect. The power curve exhibits a clear sigmoidal shape, rising steeply between $\varepsilon=0.45$ (power 0.57) and $\varepsilon=0.65$ (power above 0.80). The minimum contamination detectable at power 0.80 is $\varepsilon_{\min}=0.625$.
+
+From an applied perspective, this result means that MMMD can reliably flag a difference when roughly three-fifths or more of the second sample is drawn from a heavy-tailed distribution, even though both populations share the same mean and covariance structure. When contamination is below 40\%, the kernel-based statistic cannot reliably separate the null from the alternative at this sample size. This is consistent with the known difficulty of distinguishing Gaussian and $t_{10}$ distributions in moderate dimensions without large samples.
 
 \begin{figure}[H]
 \centering
@@ -332,6 +340,12 @@ All experiments use $d=30$, AR(1) covariance with $\rho=0.5$, multiplier bootstr
 \caption{$\varepsilon$-contamination sensitivity. $P=\mathcal{N}(0,\Sigma)$, $Q=(1-\varepsilon)\mathcal{N}(0,\Sigma)+\varepsilon\cdot t_{10}(0,\Sigma)$. GEXP kernel, $r=5$, $n=100$. Power reaches 0.80 at $\varepsilon=0.625$.}
 \label{fig:eps-sensitivity}
 \end{figure}
+
+\subsection{Variance-scale sensitivity}
+
+Figure~\ref{fig:var-sensitivity} and Table~\ref{tab:var-sensitivity} examine the minimum detectable covariance scaling. Under $P=\mathcal{N}(0,\Sigma_0)$ and $Q=\mathcal{N}(0,k\cdot\Sigma_0)$, the parameter $k>1$ controls the magnitude of the covariance inflation in the second population. All three MMMD kernel families (Mixed, Gauss, and LAP) detect $k_{\min}=1.25$ at power $\geq 0.80$, meaning a 25\% inflation in the overall covariance scale is sufficient for reliable detection. In contrast, the single-kernel Gaussian MMD requires $k_{\min}=1.40$, a 40\% inflation, to reach the same power threshold.
+
+The gap is most striking at small effect sizes. At $k=1.20$ (a 20\% covariance increase), the multi-kernel methods achieve power 0.71--0.79, while the single-kernel baseline remains at 0.18. This roughly four-fold difference illustrates the practical value of multi-kernel aggregation: when the distributional shift is subtle relative to sampling variability, combining several bandwidths provides a more sensitive aggregate statistic than any single bandwidth can offer alone. The three MMMD variants perform similarly in this setting, suggesting that the aggregation mechanism (Mahalanobis weighting), rather than the specific kernel family, drives the gain over the single-kernel test.
 
 \begin{figure}[H]
 \centering
@@ -356,6 +370,12 @@ Gauss MMD (single) & 1.40 & 0.18 \\
 \end{tabular}
 \end{table}
 
+\subsection{Type-I error calibration and ROC analysis}
+
+Table~\ref{tab:type1} reports empirical Type-I error rates for the three kernel families at bandwidth counts $r\in\{3,5,10\}$. At moderate bandwidth counts ($r=3$ and $r=5$), all families are well-calibrated near the nominal $\alpha=0.05$. At $r=10$, a divergence appears: GEXP inflates to 0.120, exceeding twice the nominal rate; MIXED rises to 0.070; while LAP remains stable at 0.050. This pattern is consistent with the geometry of the kernel families. Gaussian kernels with close bandwidths produce near-identical Gram matrices, making the empirical covariance $\hat{\Sigma}$ nearly singular even after the paper's ridge regularization. Laplace kernels, with their heavier tails in the feature space, maintain better separation between neighbouring bandwidths, so the covariance estimate remains better conditioned at larger $r$.
+
+Figure~\ref{fig:roc} provides the ROC perspective at a fixed variance-shift alternative ($k=1.25$). All three families trace similar ROC curves with false-positive rates (FPR) near 0.05 and true-positive rates (TPR) between 0.435 and 0.500. The fact that TPR values are comparable despite the Type-I differences at large $r$ is informative: the calibration advantage of LAP at $r=10$ does not translate into a substantial power advantage when the alternative is strong enough to be detected by any of the families. The practical guidance is to keep GEXP at $r\leq 5$ for well-calibrated inference, and to prefer LAP when a larger bandwidth bank is desired.
+
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.78\textwidth]{figures/mmmd_roc_curves.png}
@@ -378,6 +398,14 @@ MIXED & 0.050 & 0.050 & 0.070 \\
 \end{tabular}
 \end{table}
 
+\subsection{Graph-MMMD: construction, calibration, and skewness robustness}
+
+The Graph-MMMD extension replaces the Euclidean kernel with a diffusion-based kernel constructed from the sample graph. A $k$-nearest-neighbor graph is built on the pooled sample $\mathcal{X}_m\cup\mathcal{Y}_n$, the normalized graph Laplacian $L$ is formed, and the heat kernel $K_t=\exp(-tL)$ generates a family of kernels indexed by the diffusion time $t$. This construction is appealing for biomedical applications where the natural geometry of the data may be non-Euclidean --- for instance, when samples lie on a low-dimensional manifold or exhibit cluster structure that Euclidean distances do not capture well.
+
+Figure~\ref{fig:graph-type1} validates the Type-I error of Graph-MMMD under four null distributions that differ in their tail weight and asymmetry: Gaussian AR(1) ($\rho=0.5$), scaled Gaussian ($k=1.5$), skew-normal with shape $\alpha=5$, and multivariate Laplace. Empirical rejection rates are 0.027, 0.020, 0.020, and 0.033, respectively --- all well below the nominal 0.05 level. The method is not inflated by either heavy tails (Laplace) or asymmetry (skew-normal).
+
+Figure~\ref{fig:skew-type1} provides a finer-grained skewness sweep. The skew-normal shape parameter $\alpha$ is mapped to standardized skewness via the known moment formulas, and $\alpha$ is solved numerically by \texttt{uniroot()} to hit six target skewness levels from 0.00 (symmetric) to 0.90 (strongly skewed). Across the full range, Type-I error stays between 0.020 and 0.053 with no systematic upward or downward trend. This stability is noteworthy because many parametric tests that assume symmetry can become liberal under skewed nulls; Graph-MMMD shows no such sensitivity. The absence of monotonic drift also suggests that the graph Laplacian eigenstructure is not systematically altered by skewness in a way that biases the kernel-based statistic under $H_0$.
+
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.78\textwidth]{figures/mmmd_graph_type1.png}
@@ -391,6 +419,12 @@ MIXED & 0.050 & 0.050 & 0.070 \\
 \caption{Graph-MMMD Type-I error across skewness levels (skew-normal distribution, shape parameter $\alpha$ mapped to standardized skewness). Type-I error remains $\leq 0.053$ up to standardized skewness 0.90.}
 \label{fig:skew-type1}
 \end{figure}
+
+\subsection{Mixture distribution power reproduction}
+
+Figure~\ref{fig:mixture} and Table~\ref{tab:mixture} reproduce the original paper's normal-$t$ mixture experiment (Fig.~2). The two populations are $P=(1-p)\mathcal{N}(0,\Sigma_0)+p\cdot t_{10}(0,\Sigma_0)$ and $Q=(1-p)\mathcal{N}(0,\Sigma_1)+p\cdot t_{10}(0,\Sigma_1)$ with $\Sigma_1=1.25\cdot\Sigma_0$, and the mixture proportion $p\in\{0,0.4,1.0\}$ controls how much of each sample is heavy-tailed. At $p=0$, the populations differ only through the 25\% covariance inflation, and Mixed MMMD achieves power 0.96 versus 0.46 for the single-kernel benchmark. At $p=0.4$, the gap narrows slightly to 0.80 versus 0.31. At $p=1.0$ (both populations are pure $t_{10}$), the power drops for all methods but the multi-kernel advantage persists: 0.58 versus 0.35.
+
+Two patterns are worth noting. First, power decreases monotonically with $p$ for all methods, because the $t_{10}$ tails inject more variance into both samples and make the covariance difference harder to isolate. Second, the relative advantage of MMMD over the single-kernel test is roughly stable (2--5$\times$) across all three $p$ levels, confirming that the benefit of multi-kernel aggregation is not specific to a particular mixture proportion. This reproduction anchors our numerical extensions to the original paper's Figure~2 and confirms that our R implementation recovers the expected qualitative patterns.
 
 \begin{figure}[H]
 \centering
@@ -413,6 +447,8 @@ $p$ & MMMD-Mix & MMMD-Gauss & MMMD-LAP & MMD-Gauss \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+Overall, these numerical extensions show that the Mahalanobis aggregation strategy generalizes well beyond the Gaussian mean-shift and variance-shift settings studied in the original paper. The multi-kernel advantage is most pronounced when the distributional difference is small relative to the noise, and the calibration properties are generally well-behaved provided the bandwidth count is kept moderate or the LAP family is used. The graph-based variant further demonstrates that the MMMD framework can accommodate non-Euclidean kernel constructions without compromising Type-I error control.
 
 \begin{thebibliography}{9}
 
