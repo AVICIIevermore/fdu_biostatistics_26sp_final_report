@@ -108,19 +108,117 @@ We replicate the original paper's normal-$t$ mixture experiment (Fig.~2). Let $P
 
 Multi-kernel MMMD aggregation consistently outperforms single-kernel MMD across contamination, variance scaling, mixture, and graph-based alternatives. Three practical guidelines emerge. First, limit GEXP to $r\leq 5$ or use LAP for larger kernel banks to avoid Type-I inflation. Second, the largest relative gain of MMMD over single-kernel MMD appears when the distributional difference is small, making MMMD particularly suitable for subtle biomedical group comparisons. Third, graph-based kernels extend MMMD to non-Euclidean sample geometry without sacrificing calibration, even under strong asymmetry.
 
-\section{Other numerical results (to be completed)}
+\section{CNN representation-assisted MMMD for image two-sample testing}
+\label{sec:cnn-mmmd}
 
-\textit{This section is reserved for another worker.}
+Kernel two-sample tests depend not only on the choice of kernel, but also on the representation to which the kernel is applied. We therefore evaluated MMMD on learned CNN features in addition to raw pixels. A small CNN was trained once on an independent labelled split and then frozen. All subsequent tests used cached embeddings; the network was not updated using either two-sample test group.
 
-Suggested content:
-\begin{itemize}
-  \item Add simulations or reproductions outside the representation-experiment folder.
-  \item Report the experimental protocol, parameter settings, baselines, and numerical results.
-  \item Use separate tables for power and Type-I error.
-  \item Make clear whether each result is a reproduction, a simplified pedagogical example, or a new extension.
-\end{itemize}
+Two representations were considered. The first was the 128-dimensional penultimate embedding (FC-128), immediately before the linear classifier. The second combined features from a shallow layer, an intermediate layer, and FC-128. For this multilayer representation, we used either one Gaussian kernel per layer, producing three MMD components, or five bandwidths per layer, producing 15 components. MMMD then aggregated these layer--kernel components through the same Mahalanobis statistic used in the original method.
 
-\section{Representation-assisted MMMD experiments}
+MNIST additive-noise experiments served as an initial implementation check and showed that learned representations could improve power in selected noise settings without a corresponding increase in matched-null rejection. We next applied the same pipeline to PathMNIST. In the class-mixture experiment, \texttt{mix635} and \texttt{mix835} shared labels 3 and 5 but differed by replacing label 6 with label 8. Formal PathMNIST analyses used 10 outer repetitions, 500 independent tests per repetition, and 500 multiplier-bootstrap draws, giving 5000 tests per method and sample-size cell.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dechao_mnist_pilot_power_simple.png}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dechao_pathmnist_class_power_simple.png}
+\end{minipage}
+\caption{Power curves for the four representation choices used in CNN-MMMD. The paired panels emphasize FC-128 and multilayer embeddings as the central representation-level contribution.}
+\label{fig:dechao-main-pilot-class-power}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Representative PathMNIST rejection rates. The class-mixture null compares \texttt{mix635} with itself. Center-shift alternatives compare source-holdout and external images within the same tissue label.}
+\label{tab:dechao-main-rejection}
+\small
+\setlength{\tabcolsep}{4.2pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrrr}
+\toprule
+Task & Setting & Raw pixel & FC-128 & Multilayer single & Multilayer G15 \\
+\midrule
+Class mixture, \(n=90\) & H1 & 0.4966 & 0.7740 & 0.6254 & 0.7960 \\
+Class mixture, \(n=120\) & H1 & 0.6356 & 0.9628 & 0.7966 & 0.9588 \\
+Class mixture, \(n=120\) & matched H0 & 0.0330 & 0.0104 & 0.0144 & 0.0170 \\
+Label 6 center shift, \(n=50\) & H1 & 0.7816 & 0.7634 & 0.9912 & 0.9890 \\
+Label 8 center shift, \(n=50\) & H1 & 0.9600 & 0.9574 & 0.9852 & 0.9750 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+For the class-mixture alternative, FC-128 and multilayer G15 were substantially more powerful than raw pixels at \(n=90\) and \(n=120\), while all matched-null rejection rates were below 0.05. The single-Gaussian multilayer representation did not uniformly improve on FC-128, indicating that adding representation levels is not automatically beneficial; performance depends on how the alternative is expressed in the learned feature space.
+
+We then considered a within-class source-vs-external comparison for labels 6 and 8. Here the tissue label was fixed, so the alternative represented center-associated variation rather than a change in class composition. At \(n=50\), multilayer representations were especially sensitive for label 6, whereas raw pixels and FC-128 were already highly sensitive for label 8. Some small-sample internal-null checks for multilayer G15 were mildly liberal. Center-shift rejection rates were therefore interpreted together with the corresponding source-internal and external-internal null rates. Detailed label-specific power curves and internal-null checks are shown in Figure~\ref{fig:app-dechao-center-results}.
+
+To examine where the center-shift signal appeared within FC-128, we decomposed the embedding using the frozen classifier head. Let \(h(x)\in\mathbb{R}^{128}\) denote FC-128 and let
+\[
+\ell(x)=Wh(x)+b
+\]
+be the classifier logits. Because softmax is invariant to a common shift of all logits, we centered the classifier weights across classes:
+\[
+H_C=I_C-\frac{1}{C}\mathbf{1}\mathbf{1}^{\top},
+\qquad
+W_c=H_CW.
+\]
+We then defined
+\[
+h_{\mathrm{sem}}(x)
+=
+P_{\operatorname{row}(W_c)}h(x),
+\qquad
+h_{\mathrm{res}}(x)
+=
+h(x)-h_{\mathrm{sem}}(x).
+\]
+The first component affects class-relative logits, whereas
+\[
+W_ch_{\mathrm{res}}(x)=0,
+\]
+so the residual component is not used by the final linear classifier. This decomposition was used as a diagnostic of the detected shift, rather than as a new classifier.
+
+\begin{table}[H]
+\centering
+\caption{Representative rejection rates from the centered semantic/residual decomposition.}
+\label{tab:dechao-semantic-residual}
+\small
+\setlength{\tabcolsep}{7pt}
+\begin{tabular}{lccc}
+\toprule
+Task & Logits & Semantic component & Residual component \\
+\midrule
+Class mixture, \(n=120\) & 0.9798 & 0.9582 & 0.9546 \\
+Label 6 center shift, \(n=50\) & 0.8578 & 0.8250 & 0.7504 \\
+Label 8 center shift, \(n=50\) & 0.8200 & 0.8400 & 0.9580 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All three components detected the class-mixture alternative, with logits giving the largest rejection rate. Label 6 center shift was also more strongly detected by logits and the semantic component. In contrast, label 8 center shift was strongest in the residual component, with rejection rate 0.958 compared with 0.820 for logits and 0.840 for the semantic component.
+
+Because the centered semantic subspace had rank at most eight, we checked whether the residual result was simply due to its larger effective dimension. At \(n=50\), reducing the label-8 residual representation to its leading eight principal components gave rejection rate 0.965, while an eight-dimensional random projection gave 0.8895; the full residual representation gave 0.975. A label-8-specific PCA sweep gave rejection rates 0.595, 0.925, and 0.960 for \(k=1,2,\) and \(4\) components, respectively. Thus most of the detectable residual shift was concentrated in a small number of directions. The dimension-matched and PCA-sweep diagnostics are shown in Figure~\ref{fig:app-dechao-residual-dimension}. An additional permutation calibration produced rejection rates similar to the multiplier-bootstrap analysis (Figure~\ref{fig:app-dechao-permutation-check}).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.94\textwidth]{figures/dechao_semantic_vs_residual_power.png}
+\caption{MMMD rejection rates for logits, centered semantic features, and residual features. All components detect the class-mixture alternative, whereas the label-8 center shift is strongest in residual coordinates.}
+\label{fig:dechao-semantic-residual-main}
+\end{figure}
+
+We next examined whether the label-8 residual separation was associated with color or staining. A logistic classifier was first trained on residual features to distinguish source from external images, producing an out-of-sample source--external score. For each image, we also extracted 15 color summaries: the mean, standard deviation, and 10th, 50th, and 90th percentiles of each RGB channel. A separate regression was then fitted to predict the residual source--external score from these color summaries.
+
+On held-out images, the color summaries explained \(72.8\%\) of the variation in the top-eight residual score and \(53.4\%\) of the variation in the full-residual score. Removing the color-predicted component reduced the corresponding source--external AUCs from \(0.778\) to \(0.622\) and from \(0.869\) to \(0.737\) (Figure~\ref{fig:app-dechao-color-score}). In a separate two-sample analysis using only the 15 color summaries, MMMD power reached \(0.960\) at \(n=50\).
+
+Finally, source and external images were matched on a color-based propensity score before rerunning residual MMMD. After matching, rejection rates for both the top-eight and full residual representations fell to \(0.455\) at \(n=50\), while the maximum matched internal-null rejection rate was \(0.110\). Matching therefore removed a substantial fraction of the original residual separation, although the rejection rate remained above the internal-null reference (Figure~\ref{fig:app-dechao-color-mmmd}).
+
+Taken together, the experiments show that CNN representations can improve MMMD power for the PathMNIST class-mixture alternative, but the most informative representation depends on the alternative. For label 8, the within-class source-vs-external difference was concentrated in low-dimensional residual directions and was strongly associated with color and staining summaries. The result is therefore described as a color/stain-associated residual domain shift, rather than evidence of a purely morphological difference. Additional diagnostics are reported in Appendix~\ref{app:dechao-cnn-mmmd}.
+
+
+\section{Beyond task-trained CNNs: frozen visual encoders and stabilized testing}
 
 This section studies whether the feature space used before testing changes the behavior of MMMD-style two-sample tests. Most comparisons keep the testing layer fixed, so differences in power mainly reflect differences in representation rather than changes in the statistic itself.
 
@@ -186,6 +284,315 @@ These experiments are still limited by computational resources and time. The mai
 
 \clearpage
 \appendix
+\section{MMMD numerical extension: detailed figures and tables}
+\label{app:numext}
+
+All experiments in this section use synthetic data with dimension $d=30$, AR(1) covariance structure ($\rho=0.5$), and sample size $n=100$ unless noted otherwise. The testing layer uses the paper's multiplier bootstrap with $B=500$ draws per test and $N=150$--$200$ independent Monte Carlo trials per experimental condition. Three kernel families are examined: GEXP (Gaussian kernel with an exponential bandwidth grid), LAP (Laplace kernel with the same grid structure), and MIXED (concatenated Gaussian and Laplace kernels). The R implementation is organized as a modular library with a parallel backend for Monte Carlo replication.
+
+\subsection{Contamination sensitivity}
+
+Figure~\ref{fig:eps-sensitivity} shows how MMMD power varies with the heavy-tailed contamination fraction $\varepsilon$ under $P=\mathcal{N}(0,\Sigma)$ and $Q=(1-\varepsilon)\mathcal{N}(0,\Sigma)+\varepsilon\cdot t_{10}(0,\Sigma)$. When $\varepsilon=0$, the two populations are identical and rejection rates stay near the nominal level. As $\varepsilon$ increases from 0 to 1, the proportion of $t_{10}$ draws in $Q$ grows, and the distributional discrepancy becomes easier to detect. The power curve exhibits a clear sigmoidal shape, rising steeply between $\varepsilon=0.45$ (power 0.57) and $\varepsilon=0.65$ (power above 0.80). The minimum contamination detectable at power 0.80 is $\varepsilon_{\min}=0.625$.
+
+From an applied perspective, this result means that MMMD can reliably flag a difference when roughly three-fifths or more of the second sample is drawn from a heavy-tailed distribution, even though both populations share the same mean and covariance structure. When contamination is below 40\%, the kernel-based statistic cannot reliably separate the null from the alternative at this sample size. This is consistent with the known difficulty of distinguishing Gaussian and $t_{10}$ distributions in moderate dimensions without large samples.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/mmmd_epsilon_sensitivity.png}
+\caption{$\varepsilon$-contamination sensitivity. $P=\mathcal{N}(0,\Sigma)$, $Q=(1-\varepsilon)\mathcal{N}(0,\Sigma)+\varepsilon\cdot t_{10}(0,\Sigma)$. GEXP kernel, $r=5$, $n=100$. Power reaches 0.80 at $\varepsilon=0.625$.}
+\label{fig:eps-sensitivity}
+\end{figure}
+
+\subsection{Variance-scale sensitivity}
+
+Figure~\ref{fig:var-sensitivity} and Table~\ref{tab:var-sensitivity} examine the minimum detectable covariance scaling. Under $P=\mathcal{N}(0,\Sigma_0)$ and $Q=\mathcal{N}(0,k\cdot\Sigma_0)$, the parameter $k>1$ controls the magnitude of the covariance inflation in the second population. All three MMMD kernel families (Mixed, Gauss, and LAP) detect $k_{\min}=1.25$ at power $\geq 0.80$, meaning a 25\% inflation in the overall covariance scale is sufficient for reliable detection. In contrast, the single-kernel Gaussian MMD requires $k_{\min}=1.40$, a 40\% inflation, to reach the same power threshold.
+
+The gap is most striking at small effect sizes. At $k=1.20$ (a 20\% covariance increase), the multi-kernel methods achieve power 0.71--0.79, while the single-kernel baseline remains at 0.18. This roughly four-fold difference illustrates the practical value of multi-kernel aggregation: when the distributional shift is subtle relative to sampling variability, combining several bandwidths provides a more sensitive aggregate statistic than any single bandwidth can offer alone. The three MMMD variants perform similarly in this setting, suggesting that the aggregation mechanism (Mahalanobis weighting), rather than the specific kernel family, drives the gain over the single-kernel test.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/mmmd_variance_sensitivity.png}
+\caption{Variance-scale sensitivity. $P=\mathcal{N}(0,\Sigma_0)$, $Q=\mathcal{N}(0,k\cdot\Sigma_0)$. Mixed MMMD detects $k_{\min}=1.25$; single-kernel Gauss MMD requires $k_{\min}=1.40$.}
+\label{fig:var-sensitivity}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Variance-scale sensitivity: endpoint power and detection thresholds.}
+\label{tab:var-sensitivity}
+\begin{tabular}{lcc}
+\toprule
+Method & $k_{\min}$ (power $\geq 0.80$) & Power at $k=1.20$ \\
+\midrule
+Mixed MMMD  & 1.25 & 0.71 \\
+Gauss MMMD  & 1.25 & 0.79 \\
+LAP MMMD    & 1.25 & 0.75 \\
+Gauss MMD (single) & 1.40 & 0.18 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Type-I error calibration and ROC analysis}
+
+Table~\ref{tab:type1} reports empirical Type-I error rates for the three kernel families at bandwidth counts $r\in\{3,5,10\}$. At moderate bandwidth counts ($r=3$ and $r=5$), all families are well-calibrated near the nominal $\alpha=0.05$. At $r=10$, a divergence appears: GEXP inflates to 0.120, exceeding twice the nominal rate; MIXED rises to 0.070; while LAP remains stable at 0.050. This pattern is consistent with the geometry of the kernel families. Gaussian kernels with close bandwidths produce near-identical Gram matrices, making the empirical covariance $\hat{\Sigma}$ nearly singular even after the paper's ridge regularization. Laplace kernels, with their heavier tails in the feature space, maintain better separation between neighbouring bandwidths, so the covariance estimate remains better conditioned at larger $r$.
+
+Figure~\ref{fig:roc} provides the ROC perspective at a fixed variance-shift alternative ($k=1.25$). All three families trace similar ROC curves with false-positive rates (FPR) near 0.05 and true-positive rates (TPR) between 0.435 and 0.500. The fact that TPR values are comparable despite the Type-I differences at large $r$ is informative: the calibration advantage of LAP at $r=10$ does not translate into a substantial power advantage when the alternative is strong enough to be detected by any of the families. The practical guidance is to keep GEXP at $r\leq 5$ for well-calibrated inference, and to prefer LAP when a larger bandwidth bank is desired.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/mmmd_roc_curves.png}
+\caption{ROC curves for three kernel families at a fixed variance-shift alternative ($d=30$, $k=1.25$, $n=100$). All families maintain FPR $\approx 0.05$ with comparable TPR.}
+\label{fig:roc}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Type-I error across kernel families and bandwidth counts. Nominal level $\alpha=0.05$.}
+\label{tab:type1}
+\begin{tabular}{lccc}
+\toprule
+Kernel family & $r=3$ & $r=5$ & $r=10$ \\
+\midrule
+GEXP  & 0.020 & 0.055 & 0.120 \\
+LAP   & 0.045 & 0.045 & 0.050 \\
+MIXED & 0.050 & 0.050 & 0.070 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Graph-MMMD: construction, calibration, and skewness robustness}
+
+The Graph-MMMD extension replaces the Euclidean kernel with a diffusion-based kernel constructed from the sample graph. A $k$-nearest-neighbor graph is built on the pooled sample $\mathcal{X}_m\cup\mathcal{Y}_n$, the normalized graph Laplacian $L$ is formed, and the heat kernel $K_t=\exp(-tL)$ generates a family of kernels indexed by the diffusion time $t$. This construction is appealing for biomedical applications where the natural geometry of the data may be non-Euclidean --- for instance, when samples lie on a low-dimensional manifold or exhibit cluster structure that Euclidean distances do not capture well.
+
+Figure~\ref{fig:graph-type1} validates the Type-I error of Graph-MMMD under four null distributions that differ in their tail weight and asymmetry: Gaussian AR(1) ($\rho=0.5$), scaled Gaussian ($k=1.5$), skew-normal with shape $\alpha=5$, and multivariate Laplace. Empirical rejection rates are 0.027, 0.020, 0.020, and 0.033, respectively --- all well below the nominal 0.05 level. The method is not inflated by either heavy tails (Laplace) or asymmetry (skew-normal).
+
+Figure~\ref{fig:skew-type1} provides a finer-grained skewness sweep. The skew-normal shape parameter $\alpha$ is mapped to standardized skewness via the known moment formulas, and $\alpha$ is solved numerically by \texttt{uniroot()} to hit six target skewness levels from 0.00 (symmetric) to 0.90 (strongly skewed). Across the full range, Type-I error stays between 0.020 and 0.053 with no systematic upward or downward trend. This stability is noteworthy because many parametric tests that assume symmetry can become liberal under skewed nulls; Graph-MMMD shows no such sensitivity. The absence of monotonic drift also suggests that the graph Laplacian eigenstructure is not systematically altered by skewness in a way that biases the kernel-based statistic under $H_0$.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/mmmd_graph_type1.png}
+\caption{Graph-MMMD Type-I error under four null distributions. The graph-based kernel uses a $k$NN graph Laplacian with heat kernel $K_t=\exp(-tL)$. All rejection rates are at or below 0.053.}
+\label{fig:graph-type1}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/mmmd_skew_type1.png}
+\caption{Graph-MMMD Type-I error across skewness levels (skew-normal distribution, shape parameter $\alpha$ mapped to standardized skewness). Type-I error remains $\leq 0.053$ up to standardized skewness 0.90.}
+\label{fig:skew-type1}
+\end{figure}
+
+\subsection{Mixture distribution power reproduction}
+
+Figure~\ref{fig:mixture} and Table~\ref{tab:mixture} reproduce the original paper's normal-$t$ mixture experiment (Fig.~2). The two populations are $P=(1-p)\mathcal{N}(0,\Sigma_0)+p\cdot t_{10}(0,\Sigma_0)$ and $Q=(1-p)\mathcal{N}(0,\Sigma_1)+p\cdot t_{10}(0,\Sigma_1)$ with $\Sigma_1=1.25\cdot\Sigma_0$, and the mixture proportion $p\in\{0,0.4,1.0\}$ controls how much of each sample is heavy-tailed. At $p=0$, the populations differ only through the 25\% covariance inflation, and Mixed MMMD achieves power 0.96 versus 0.46 for the single-kernel benchmark. At $p=0.4$, the gap narrows slightly to 0.80 versus 0.31. At $p=1.0$ (both populations are pure $t_{10}$), the power drops for all methods but the multi-kernel advantage persists: 0.58 versus 0.35.
+
+Two patterns are worth noting. First, power decreases monotonically with $p$ for all methods, because the $t_{10}$ tails inject more variance into both samples and make the covariance difference harder to isolate. Second, the relative advantage of MMMD over the single-kernel test is roughly stable (2--5$\times$) across all three $p$ levels, confirming that the benefit of multi-kernel aggregation is not specific to a particular mixture proportion. This reproduction anchors our numerical extensions to the original paper's Figure~2 and confirms that our R implementation recovers the expected qualitative patterns.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/mmmd_fig2_mixture.png}
+\caption{Reproduction of the original paper's Fig.~2: power under a normal-$t$ mixture alternative. $\Sigma_1=1.25\cdot\Sigma_0$, $\nu=10$. MMMD methods achieve 2--5$\times$ the power of single-kernel Gauss MMD.}
+\label{fig:mixture}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Mixture-distribution power: $P=(1-p)\mathcal{N}(0,\Sigma_0)+p\cdot t_{10}(0,\Sigma_0)$, $Q=(1-p)\mathcal{N}(0,\Sigma_1)+p\cdot t_{10}(0,\Sigma_1)$ with $\Sigma_1=1.25\cdot\Sigma_0$.}
+\label{tab:mixture}
+\begin{tabular}{lcccc}
+\toprule
+$p$ & MMMD-Mix & MMMD-Gauss & MMMD-LAP & MMD-Gauss \\
+\midrule
+0.0 & 0.96 & 0.89 & 0.94 & 0.46 \\
+0.4 & 0.80 & 0.84 & 0.71 & 0.31 \\
+1.0 & 0.58 & 0.69 & 0.53 & 0.35 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Overall, these numerical extensions show that the Mahalanobis aggregation strategy generalizes well beyond the Gaussian mean-shift and variance-shift settings studied in the original paper. The multi-kernel advantage is most pronounced when the distributional difference is small relative to the noise, and the calibration properties are generally well-behaved provided the bandwidth count is kept moderate or the LAP family is used. The graph-based variant further demonstrates that the MMMD framework can accommodate non-Euclidean kernel constructions without compromising Type-I error control.
+
+\clearpage
+\section{Detailed CNN-MMMD component figures}
+\label{app:dechao-cnn-mmmd}
+\captionsetup[figure]{font=small,skip=4pt}
+\captionsetup[table]{font=small,skip=4pt}
+
+This appendix collects the figures supporting Section~\ref{sec:cnn-mmmd}. Related panels are grouped so that each subsection corresponds to one step of the analysis: initial validation, PathMNIST power and calibration, same-label center shift, semantic/residual decomposition, and color/stain controls.
+
+\subsection{Evidence map and run sizes}
+
+Formal PathMNIST power and internal-null analyses used 10 outer repetitions, 500 independent tests per repetition, and 500 multiplier-bootstrap draws. The smaller mechanism and robustness experiments used the run sizes reported in their respective result files.
+
+\begin{table}[H]
+\centering
+\caption{Role of each experimental stage in the CNN-MMMD analysis.}
+\label{tab:app-dechao-ledger}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.69\textwidth}}
+\toprule
+Stage & Purpose and evidence \\
+\midrule
+MNIST validation & Compare raw pixels, FC-128, and multilayer representations across additive-noise levels, with matched-null Type-I checks. \\
+PathMNIST class mixture & Measure power for \texttt{mix635} versus \texttt{mix835} and verify calibration with a matched \texttt{mix635} null. \\
+Same-label center shift & Compare source-holdout and external images within labels 6 and 8, with source-internal and external-internal null checks. \\
+Semantic/residual analysis & Decompose FC-128 into classifier-used and classifier-ignored components and compare their rejection rates. \\
+Residual robustness & Match the effective dimension of the semantic and residual spaces, vary residual PCA dimension, and compare bootstrap with permutation calibration. \\
+Color/stain controls & Explain the residual source--external score with RGB summaries, run color-only MMMD, and repeat residual MMMD after color matching. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.86\textwidth]{figures/dechao_mnist_cnn_power.png}\\[-2pt]
+\textbf{(a)} Power across additive-noise levels
+\caption{MNIST additive-noise power. Abbreviations: Raw, raw pixels; L1, first CNN layer; L2, second CNN layer; FC, FC-128 final embedding; ML-S, multilayer single-Gaussian aggregation; ML-G15, multilayer Gaussian-15 aggregation.}
+\label{fig:app-dechao-mnist-power}
+\end{figure}
+
+\subsection{MNIST validation}
+
+MNIST was used as a controlled image benchmark before moving to biomedical patches. The CNN was trained on the MNIST training split, frozen, and evaluated through MMMD on held-out images.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}[t]{0.43\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dechao_mnist_type1_set123.png}\\[-2pt]
+\textbf{(b)} Matched null: \texttt{set123}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.43\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dechao_mnist_type1_set128.png}\\[-2pt]
+\textbf{(c)} Matched null: \texttt{set128}
+\end{minipage}
+\caption{MNIST matched-null validation. Panels (b) and (c) show H0 rejection rates for \texttt{set123} and \texttt{set128} relative to the nominal 0.05 level.}
+\label{fig:app-dechao-mnist-validation}
+\end{figure}
+
+\subsection{PathMNIST class-mixture power and calibration}
+
+The class-mixture experiment compares \texttt{mix635} with \texttt{mix835}; the matched null compares \texttt{mix635} with itself.
+
+\begin{center}
+\includegraphics[width=0.80\textwidth]{figures/dechao_pathmnist_class_mixture_power.png}\\[-2pt]
+\textbf{(a)} Class-mixture power
+\end{center}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.80\textwidth]{figures/dechao_pathmnist_class_type1_zoom.png}\\[-2pt]
+\textbf{(b)} Matched-null Type-I error
+\caption{PathMNIST class-mixture results. CNN representations increase power for \texttt{mix635} versus \texttt{mix835}, while the matched-null rejection rates remain below 0.05.}
+\label{fig:app-dechao-path-class}
+\end{figure}
+
+\subsection{Same-label source-vs-external center shift}
+
+The center-shift experiment fixes the tissue label and compares source-holdout images with external-test images. The examples below illustrate visible source--external variation within the same label; the accompanying curves provide the corresponding power and internal-null checks.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.94\textwidth]{figures/dechao_pathmnist_examples_wide.png}
+\caption{PathMNIST examples used to motivate the same-label center-shift analysis. The left block shows representative tissue classes near the labels used in the experiments; the right block compares source and external images within labels 6 and 8.}
+\label{fig:app-dechao-examples}
+\end{figure}
+
+\begin{center}
+\includegraphics[width=0.80\textwidth]{figures/dechao_center_shift_power_label6.png}\\[-2pt]
+\textbf{(a)} Label 6 power
+\end{center}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.80\textwidth]{figures/dechao_center_shift_power_label8.png}\\[-2pt]
+\textbf{(b)} Label 8 power
+
+\vspace{4pt}
+\includegraphics[width=0.92\textwidth]{figures/dechao_pathmnist_center_shift_type1.png}\\[-2pt]
+\textbf{(c)} Source-internal and external-internal null checks
+\caption{Same-label PathMNIST center-shift results. Panels (a) and (b) show source-vs-external rejection rates; panel (c) gives the internal-null calibration reference, including the small-sample inflation of multilayer Gaussian-15.}
+\label{fig:app-dechao-center-results}
+\end{figure}
+
+\subsection{Semantic/residual decomposition and dimensionality checks}
+
+The FC-128 decomposition compares classifier logits, the centered classifier row-space projection, and its residual complement. The label-8 analysis then checks whether residual dominance survives dimension matching and how many residual principal components are needed.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.88\textwidth]{figures/dechao_semantic_vs_residual_power.png}
+\caption{Semantic/residual MMMD readout across the main PathMNIST tasks. Label-8 source-vs-external center shift is strongest in the residual component.}
+\label{fig:app-dechao-semres-power}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dechao_label8_residual_dimension_matched.png}\\[-2pt]
+\textbf{(a)} Dimension-matched comparison at \(n=50\)
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dechao_label8_residual_pca_dimension.png}\\[-2pt]
+\textbf{(b)} Label-8-specific residual PCA sweep
+\end{minipage}
+\caption{Residual dimensionality checks. Panel (a) compares the rank-8 semantic space with 8D residual projections; panel (b) shows that two to four residual principal components capture most of the label-8 signal.}
+\label{fig:app-dechao-residual-dimension}
+\end{figure}
+
+\begin{center}
+\includegraphics[width=0.80\textwidth]{figures/dechao_permutation_bootstrap_label6.png}\\[-2pt]
+\textbf{(a)} Label 6
+\end{center}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.80\textwidth]{figures/dechao_permutation_bootstrap_label8.png}\\[-2pt]
+\textbf{(b)} Label 8
+\caption{Multiplier-bootstrap and permutation calibration sensitivity check. This diagnostic used fewer inner tests than the formal PathMNIST power analysis.}
+\label{fig:app-dechao-permutation-check}
+\end{figure}
+
+\subsection{Color/stain explanation}
+
+The color analyses use 15 RGB summaries per image: the mean, standard deviation, and 10th, 50th, and 90th percentiles of each channel. The first pair of panels asks how much these summaries explain the residual source--external score; the later panels show direct two-sample and matching analyses.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dechao_color_score_r2.png}\\[-2pt]
+\textbf{(a)} Holdout \(R^2\) for the residual score
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dechao_color_score_auc_drop.png}\\[-2pt]
+\textbf{(b)} AUC before and after color residualization
+\end{minipage}
+\caption{Color summaries explain a substantial part of the label-8 residual source--external score. Removing the color-predicted component reduces held-out domain separability.}
+\label{fig:app-dechao-color-score}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dechao_color_only_mmmd.png}\\[-2pt]
+\textbf{(a)} MMMD using only the 15 color summaries
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dechao_color_matched_summary_residual.png}\\[-2pt]
+\textbf{(b)} Residual MMMD after color-propensity matching
+\end{minipage}
+\caption{Direct color controls for label 8. Color summaries alone strongly distinguish source from external images; after matching the two groups on a color-based propensity score, residual rejection is substantially reduced and is interpreted relative to the matched internal-null reference.}
+\label{fig:app-dechao-color-mmmd}
+\end{figure}
+
+\clearpage
 \section{Detailed representation experiment tables and figures}
 \label{app:repr}
 
@@ -322,133 +729,6 @@ Sample size & GEXP-5 power & NEW-MMMD power \\
 \caption{NEW-MMMD and GEXP-5 comparison across NCT-CRC representations.}
 \label{fig:newmmmd}
 \end{figure}
-
-\section{MMMD numerical extension: detailed figures and tables}
-\label{app:numext}
-
-All experiments in this section use synthetic data with dimension $d=30$, AR(1) covariance structure ($\rho=0.5$), and sample size $n=100$ unless noted otherwise. The testing layer uses the paper's multiplier bootstrap with $B=500$ draws per test and $N=150$--$200$ independent Monte Carlo trials per experimental condition. Three kernel families are examined: GEXP (Gaussian kernel with an exponential bandwidth grid), LAP (Laplace kernel with the same grid structure), and MIXED (concatenated Gaussian and Laplace kernels). The R implementation is organized as a modular library with a parallel backend for Monte Carlo replication.
-
-\subsection{Contamination sensitivity}
-
-Figure~\ref{fig:eps-sensitivity} shows how MMMD power varies with the heavy-tailed contamination fraction $\varepsilon$ under $P=\mathcal{N}(0,\Sigma)$ and $Q=(1-\varepsilon)\mathcal{N}(0,\Sigma)+\varepsilon\cdot t_{10}(0,\Sigma)$. When $\varepsilon=0$, the two populations are identical and rejection rates stay near the nominal level. As $\varepsilon$ increases from 0 to 1, the proportion of $t_{10}$ draws in $Q$ grows, and the distributional discrepancy becomes easier to detect. The power curve exhibits a clear sigmoidal shape, rising steeply between $\varepsilon=0.45$ (power 0.57) and $\varepsilon=0.65$ (power above 0.80). The minimum contamination detectable at power 0.80 is $\varepsilon_{\min}=0.625$.
-
-From an applied perspective, this result means that MMMD can reliably flag a difference when roughly three-fifths or more of the second sample is drawn from a heavy-tailed distribution, even though both populations share the same mean and covariance structure. When contamination is below 40\%, the kernel-based statistic cannot reliably separate the null from the alternative at this sample size. This is consistent with the known difficulty of distinguishing Gaussian and $t_{10}$ distributions in moderate dimensions without large samples.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.78\textwidth]{figures/mmmd_epsilon_sensitivity.png}
-\caption{$\varepsilon$-contamination sensitivity. $P=\mathcal{N}(0,\Sigma)$, $Q=(1-\varepsilon)\mathcal{N}(0,\Sigma)+\varepsilon\cdot t_{10}(0,\Sigma)$. GEXP kernel, $r=5$, $n=100$. Power reaches 0.80 at $\varepsilon=0.625$.}
-\label{fig:eps-sensitivity}
-\end{figure}
-
-\subsection{Variance-scale sensitivity}
-
-Figure~\ref{fig:var-sensitivity} and Table~\ref{tab:var-sensitivity} examine the minimum detectable covariance scaling. Under $P=\mathcal{N}(0,\Sigma_0)$ and $Q=\mathcal{N}(0,k\cdot\Sigma_0)$, the parameter $k>1$ controls the magnitude of the covariance inflation in the second population. All three MMMD kernel families (Mixed, Gauss, and LAP) detect $k_{\min}=1.25$ at power $\geq 0.80$, meaning a 25\% inflation in the overall covariance scale is sufficient for reliable detection. In contrast, the single-kernel Gaussian MMD requires $k_{\min}=1.40$, a 40\% inflation, to reach the same power threshold.
-
-The gap is most striking at small effect sizes. At $k=1.20$ (a 20\% covariance increase), the multi-kernel methods achieve power 0.71--0.79, while the single-kernel baseline remains at 0.18. This roughly four-fold difference illustrates the practical value of multi-kernel aggregation: when the distributional shift is subtle relative to sampling variability, combining several bandwidths provides a more sensitive aggregate statistic than any single bandwidth can offer alone. The three MMMD variants perform similarly in this setting, suggesting that the aggregation mechanism (Mahalanobis weighting), rather than the specific kernel family, drives the gain over the single-kernel test.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.78\textwidth]{figures/mmmd_variance_sensitivity.png}
-\caption{Variance-scale sensitivity. $P=\mathcal{N}(0,\Sigma_0)$, $Q=\mathcal{N}(0,k\cdot\Sigma_0)$. Mixed MMMD detects $k_{\min}=1.25$; single-kernel Gauss MMD requires $k_{\min}=1.40$.}
-\label{fig:var-sensitivity}
-\end{figure}
-
-\begin{table}[H]
-\centering
-\caption{Variance-scale sensitivity: endpoint power and detection thresholds.}
-\label{tab:var-sensitivity}
-\begin{tabular}{lcc}
-\toprule
-Method & $k_{\min}$ (power $\geq 0.80$) & Power at $k=1.20$ \\
-\midrule
-Mixed MMMD  & 1.25 & 0.71 \\
-Gauss MMMD  & 1.25 & 0.79 \\
-LAP MMMD    & 1.25 & 0.75 \\
-Gauss MMD (single) & 1.40 & 0.18 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Type-I error calibration and ROC analysis}
-
-Table~\ref{tab:type1} reports empirical Type-I error rates for the three kernel families at bandwidth counts $r\in\{3,5,10\}$. At moderate bandwidth counts ($r=3$ and $r=5$), all families are well-calibrated near the nominal $\alpha=0.05$. At $r=10$, a divergence appears: GEXP inflates to 0.120, exceeding twice the nominal rate; MIXED rises to 0.070; while LAP remains stable at 0.050. This pattern is consistent with the geometry of the kernel families. Gaussian kernels with close bandwidths produce near-identical Gram matrices, making the empirical covariance $\hat{\Sigma}$ nearly singular even after the paper's ridge regularization. Laplace kernels, with their heavier tails in the feature space, maintain better separation between neighbouring bandwidths, so the covariance estimate remains better conditioned at larger $r$.
-
-Figure~\ref{fig:roc} provides the ROC perspective at a fixed variance-shift alternative ($k=1.25$). All three families trace similar ROC curves with false-positive rates (FPR) near 0.05 and true-positive rates (TPR) between 0.435 and 0.500. The fact that TPR values are comparable despite the Type-I differences at large $r$ is informative: the calibration advantage of LAP at $r=10$ does not translate into a substantial power advantage when the alternative is strong enough to be detected by any of the families. The practical guidance is to keep GEXP at $r\leq 5$ for well-calibrated inference, and to prefer LAP when a larger bandwidth bank is desired.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.78\textwidth]{figures/mmmd_roc_curves.png}
-\caption{ROC curves for three kernel families at a fixed variance-shift alternative ($d=30$, $k=1.25$, $n=100$). All families maintain FPR $\approx 0.05$ with comparable TPR.}
-\label{fig:roc}
-\end{figure}
-
-\begin{table}[H]
-\centering
-\caption{Type-I error across kernel families and bandwidth counts. Nominal level $\alpha=0.05$.}
-\label{tab:type1}
-\begin{tabular}{lccc}
-\toprule
-Kernel family & $r=3$ & $r=5$ & $r=10$ \\
-\midrule
-GEXP  & 0.020 & 0.055 & 0.120 \\
-LAP   & 0.045 & 0.045 & 0.050 \\
-MIXED & 0.050 & 0.050 & 0.070 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Graph-MMMD: construction, calibration, and skewness robustness}
-
-The Graph-MMMD extension replaces the Euclidean kernel with a diffusion-based kernel constructed from the sample graph. A $k$-nearest-neighbor graph is built on the pooled sample $\mathcal{X}_m\cup\mathcal{Y}_n$, the normalized graph Laplacian $L$ is formed, and the heat kernel $K_t=\exp(-tL)$ generates a family of kernels indexed by the diffusion time $t$. This construction is appealing for biomedical applications where the natural geometry of the data may be non-Euclidean --- for instance, when samples lie on a low-dimensional manifold or exhibit cluster structure that Euclidean distances do not capture well.
-
-Figure~\ref{fig:graph-type1} validates the Type-I error of Graph-MMMD under four null distributions that differ in their tail weight and asymmetry: Gaussian AR(1) ($\rho=0.5$), scaled Gaussian ($k=1.5$), skew-normal with shape $\alpha=5$, and multivariate Laplace. Empirical rejection rates are 0.027, 0.020, 0.020, and 0.033, respectively --- all well below the nominal 0.05 level. The method is not inflated by either heavy tails (Laplace) or asymmetry (skew-normal).
-
-Figure~\ref{fig:skew-type1} provides a finer-grained skewness sweep. The skew-normal shape parameter $\alpha$ is mapped to standardized skewness via the known moment formulas, and $\alpha$ is solved numerically by \texttt{uniroot()} to hit six target skewness levels from 0.00 (symmetric) to 0.90 (strongly skewed). Across the full range, Type-I error stays between 0.020 and 0.053 with no systematic upward or downward trend. This stability is noteworthy because many parametric tests that assume symmetry can become liberal under skewed nulls; Graph-MMMD shows no such sensitivity. The absence of monotonic drift also suggests that the graph Laplacian eigenstructure is not systematically altered by skewness in a way that biases the kernel-based statistic under $H_0$.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.78\textwidth]{figures/mmmd_graph_type1.png}
-\caption{Graph-MMMD Type-I error under four null distributions. The graph-based kernel uses a $k$NN graph Laplacian with heat kernel $K_t=\exp(-tL)$. All rejection rates are at or below 0.053.}
-\label{fig:graph-type1}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.78\textwidth]{figures/mmmd_skew_type1.png}
-\caption{Graph-MMMD Type-I error across skewness levels (skew-normal distribution, shape parameter $\alpha$ mapped to standardized skewness). Type-I error remains $\leq 0.053$ up to standardized skewness 0.90.}
-\label{fig:skew-type1}
-\end{figure}
-
-\subsection{Mixture distribution power reproduction}
-
-Figure~\ref{fig:mixture} and Table~\ref{tab:mixture} reproduce the original paper's normal-$t$ mixture experiment (Fig.~2). The two populations are $P=(1-p)\mathcal{N}(0,\Sigma_0)+p\cdot t_{10}(0,\Sigma_0)$ and $Q=(1-p)\mathcal{N}(0,\Sigma_1)+p\cdot t_{10}(0,\Sigma_1)$ with $\Sigma_1=1.25\cdot\Sigma_0$, and the mixture proportion $p\in\{0,0.4,1.0\}$ controls how much of each sample is heavy-tailed. At $p=0$, the populations differ only through the 25\% covariance inflation, and Mixed MMMD achieves power 0.96 versus 0.46 for the single-kernel benchmark. At $p=0.4$, the gap narrows slightly to 0.80 versus 0.31. At $p=1.0$ (both populations are pure $t_{10}$), the power drops for all methods but the multi-kernel advantage persists: 0.58 versus 0.35.
-
-Two patterns are worth noting. First, power decreases monotonically with $p$ for all methods, because the $t_{10}$ tails inject more variance into both samples and make the covariance difference harder to isolate. Second, the relative advantage of MMMD over the single-kernel test is roughly stable (2--5$\times$) across all three $p$ levels, confirming that the benefit of multi-kernel aggregation is not specific to a particular mixture proportion. This reproduction anchors our numerical extensions to the original paper's Figure~2 and confirms that our R implementation recovers the expected qualitative patterns.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.78\textwidth]{figures/mmmd_fig2_mixture.png}
-\caption{Reproduction of the original paper's Fig.~2: power under a normal-$t$ mixture alternative. $\Sigma_1=1.25\cdot\Sigma_0$, $\nu=10$. MMMD methods achieve 2--5$\times$ the power of single-kernel Gauss MMD.}
-\label{fig:mixture}
-\end{figure}
-
-\begin{table}[H]
-\centering
-\caption{Mixture-distribution power: $P=(1-p)\mathcal{N}(0,\Sigma_0)+p\cdot t_{10}(0,\Sigma_0)$, $Q=(1-p)\mathcal{N}(0,\Sigma_1)+p\cdot t_{10}(0,\Sigma_1)$ with $\Sigma_1=1.25\cdot\Sigma_0$.}
-\label{tab:mixture}
-\begin{tabular}{lcccc}
-\toprule
-$p$ & MMMD-Mix & MMMD-Gauss & MMMD-LAP & MMD-Gauss \\
-\midrule
-0.0 & 0.96 & 0.89 & 0.94 & 0.46 \\
-0.4 & 0.80 & 0.84 & 0.71 & 0.31 \\
-1.0 & 0.58 & 0.69 & 0.53 & 0.35 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Overall, these numerical extensions show that the Mahalanobis aggregation strategy generalizes well beyond the Gaussian mean-shift and variance-shift settings studied in the original paper. The multi-kernel advantage is most pronounced when the distributional difference is small relative to the noise, and the calibration properties are generally well-behaved provided the bandwidth count is kept moderate or the LAP family is used. The graph-based variant further demonstrates that the MMMD framework can accommodate non-Euclidean kernel constructions without compromising Type-I error control.
 
 \begin{thebibliography}{9}
 
