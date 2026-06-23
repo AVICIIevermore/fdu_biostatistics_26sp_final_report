@@ -13,12 +13,21 @@
 \usepackage{array}
 \usepackage{graphicx}
 \usepackage{float}
-\usepackage{algorithm}
-\usepackage{algpseudocode}
 \usepackage{hyperref}
 \usepackage{xcolor}
 \usepackage{caption}
 \captionsetup{justification=centering,singlelinecheck=false}
+
+\newenvironment{algorithm}[1][]{\begin{figure}[H]\small}{\end{figure}}
+\newenvironment{algorithmic}[1][]{\begin{quote}\small}{\end{quote}}
+\newcommand{\Require}{\par\noindent\textbf{Input:} }
+\newcommand{\Ensure}{\par\noindent\textbf{Output:} }
+\newcommand{\State}{\par\noindent}
+\newcommand{\For}[1]{\par\noindent\textbf{for} #1 \textbf{do}}
+\newcommand{\EndFor}{\par\noindent\textbf{end for}}
+\newcommand{\If}[1]{\par\noindent\textbf{if} #1 \textbf{then}}
+\newcommand{\EndIf}{\par\noindent\textbf{end if}}
+\newcommand{\Comment}[1]{\hfill{\(\triangleright\) #1}}
 
 \hypersetup{
   colorlinks=true,
@@ -276,43 +285,32 @@ This section studies whether the feature space used before testing changes the b
 
 \subsection{From CNN features to foundation encoders}
 
-The starting point is the CNN-MMMD pipeline: train a small CNN, extract feature vectors, and run MMMD on the resulting feature matrices. This works well when labels are available, but it also makes the test depend on a dataset-specific training step. A natural alternative is to use frozen visual encoders that already contain broad image structure.
-
-We therefore compare raw pixels, task-trained CNN features, CLIP embeddings, and DINOv2 embeddings. CLIP provides an image-text contrastive representation, while DINOv2 provides a self-supervised visual representation that is often more sensitive to texture and morphology. In all cases, the two-sample test is applied after feature extraction; the encoders are not tuned on the test samples.
+The starting point is the CNN-MMMD pipeline: train a small CNN, extract feature vectors, and run MMMD on the resulting feature matrices. This works well when labels are available, but it also makes the test depend on a dataset-specific training step. We therefore ask whether frozen foundation encoders can provide a useful representation layer without retraining. Raw pixels serve as the direct image-space baseline, task-trained CNN features serve as the supervised baseline, and CLIP and DINOv2 represent two frozen encoder families. CLIP is learned through image--text contrastive training, while DINOv2 is self-supervised and often preserves texture and morphology more directly.
 
 \subsection{Experimental protocol}
 
-We report empirical power under mixture alternatives and empirical Type-I error under matched null settings. The experiments use three biomedical image benchmarks and four focused comparisons: BloodMNIST noise robustness, PathMNIST alignment with task-trained CNN baselines, NCT-CRC sample-size scaling, and a NCT-CRC testing-layer comparison between GEXP-5 and NEW-MMMD. Dataset descriptions, mixture definitions, and implementation paths are given in Appendix~\ref{app:repr}.
+We report empirical power under mixture alternatives and empirical Type-I error under matched null settings. The experiments use three biomedical image benchmarks and four focused comparisons, summarized in Table~\ref{tab:foundation-exp-summary}. Dataset descriptions, mixture definitions, implementation paths, and the BloodMNIST/PathMNIST figure are given in Appendix~\ref{app:repr}.
 
-\subsection{BloodMNIST noise robustness}
-
-The BloodMNIST experiment asks which representation survives additive image noise. Under the mixed task \((0,1,3)\) versus \((0,1,6)\), the task-trained CNN keeps power above \(0.91\) even at \(\sigma=1\), while CLIP and DINOv2 drop more sharply under heavy noise. Raw pixels are weaker at low and moderate noise, although they do not collapse as much at the largest noise level. Matched-null Type-I error stays close to nominal for the frozen encoders and is generally conservative for raw pixels and CNN features, so the power differences are not explained by uncontrolled false positives.
-
-\subsection{PathMNIST alignment with task-trained CNNs}
-
-The PathMNIST experiment asks whether frozen encoders can replace a task-trained CNN on small pathology patches. DINOv2 improves rapidly with sample size, rising from power \(0.0534\) at \(n=30\) to \(0.9904\) at \(n=150\), but small samples still favor the trained CNN baselines from the reproduction pipeline. CLIP improves more slowly, reaching power \(0.7172\) at \(n=150\). The matched-null runs are also conservative for DINOv2, with rejection rates about \(0.0038\) at \(n=60\) and \(0.0034\) at \(n=120\). For very small \(28\times 28\) pathology patches, a small CNN trained on the target distribution can still be better matched to the data than a frozen natural-image encoder.
-
-\begin{figure}[H]
+\begin{table}[H]
 \centering
-\begin{minipage}[t]{0.49\textwidth}
-\centering
-\includegraphics[width=\linewidth]{figures/bloodmnist_mixed_raw_clip_dino_cnn_gauss5.png}
-\end{minipage}\hfill
-\begin{minipage}[t]{0.49\textwidth}
-\centering
-\includegraphics[width=\linewidth]{figures/pathmnist_sample_size_vs_cnn.png}
-\end{minipage}
-\caption{BloodMNIST and PathMNIST representation experiments.}
-\label{fig:blood-path-main}
-\end{figure}
-
-\subsection{NCT-CRC sample-size scaling}
-
-The NCT-CRC experiment shows how representation rankings can change with sample size. CNN features are competitive at small and medium \(n\), but DINOv2 becomes strongest once \(n\) is large enough. At \(n=150\), power is \(0.300\) for raw pixels, \(0.750\) for CLIP, \(0.875\) for CNN features, and \(0.988\) for DINOv2. This pattern suggests that DINOv2 features capture tissue architecture that raw pixels and CLIP do not capture as efficiently.
-
-\subsection{Testing-layer stabilization with NEW-MMMD}
-
-The final experiment separates the representation layer from the testing layer. With NCT-CRC representations fixed, GEXP-5 is compared with NEW-MMMD, which stabilizes covariance estimation and prunes redundant kernels. On DINOv2 features, NEW-MMMD is conservative at very small sample size but catches up by \(n=120\) and \(n=150\). Its clearest benefit is numerical: the raw covariance condition numbers for GEXP-5 are often on the order of \(10^6\) to \(10^7\), while the regularized NEW-MMMD condition numbers are much smaller after stabilization and pruning.
+\caption{Summary of the four representation experiments.}
+\label{tab:foundation-exp-summary}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.18\textwidth}
+                >{\raggedright\arraybackslash}p{0.15\textwidth}
+                >{\raggedright\arraybackslash}p{0.30\textwidth}
+                >{\raggedright\arraybackslash}p{0.30\textwidth}}
+\toprule
+Experiment & Dataset & Comparison & Main readout \\
+\midrule
+Noise robustness & BloodMNIST-224 & Raw pixels, CLIP, DINOv2, CNN under additive noise & CNN remains strongest at heavy noise; frozen encoders degrade faster. \\
+Small-patch alignment & PathMNIST-28 & Frozen encoders versus task-trained CNN baselines & DINOv2 catches up at larger \(n\), while small samples still favor CNN features. \\
+Sample-size scaling & NCT-CRC & Raw pixels, CLIP, CNN, and DINOv2 across \(n\) & DINOv2 becomes strongest at large \(n\); raw pixels remain sample inefficient. \\
+Testing-layer stabilization & NCT-CRC & GEXP-5 versus NEW-MMMD with fixed representations & NEW-MMMD improves calibration and conditioning more consistently than power. \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{figure}[H]
 \centering
@@ -328,11 +326,9 @@ The final experiment separates the representation layer from the testing layer. 
 \label{fig:nct-newmmmd-main}
 \end{figure}
 
-\subsection{Overall insights and limitations}
+\subsection{Insights and limitations}
 
-The main insight is that representation is part of the statistical design. Raw pixels leave the kernel test to work directly in a high-dimensional noisy space. Frozen encoders often help, especially DINOv2 on pathology-style images, but they are not uniformly best. A task-trained CNN can be strongest when labels are available and the target morphology is narrow enough for a simple supervised feature extractor to learn. NEW-MMMD improves calibration and matrix conditioning, but its power gains depend on sample size and representation.
-
-These experiments are still limited by computational resources and time. The main goal is to examine whether foundation encoders, used as a representation layer, can substantially change the performance of two-sample testing. Therefore, the current study focuses on several representative feature spaces, including CLIP, DINOv2, raw pixels, and CNN features. Many directions remain open. Future work could compare more foundation models with different scales and training objectives, repeat the experiments on more medical image datasets, and test more class combinations, noise levels, and domain-shift settings. In addition, most encoders are currently frozen; fine-tuning or domain adaptation may further improve the power of MMMD-style tests.
+The four experiments give a compact picture of representation-driven two-sample testing. First, BloodMNIST shows that supervised CNN features can be more robust than frozen foundation embeddings under strong additive noise, so generic pretraining is not automatically best. Second, PathMNIST shows that DINOv2 can approach task-trained CNN baselines as sample size increases, but very small pathology patches still benefit from dataset-specific supervision. Third, NCT-CRC shows that representation rankings change with sample size: DINOv2 is strongest at large \(n\), while raw pixels are consistently inefficient. Fourth, the NEW-MMMD comparison shows that improving the testing layer mainly helps calibration and covariance conditioning; power gains still depend on the representation and sample size. These experiments are limited by computational resources and time, so they focus on representative feature spaces rather than an exhaustive benchmark. Future work could test more foundation models, more medical datasets, richer class combinations, noise and domain-shift settings, and fine-tuned or domain-adapted encoders.
 
 \clearpage
 \appendix
@@ -970,6 +966,20 @@ The implementation used for this section is organized under \path{code/Biostatis
 \includegraphics[width=0.88\textwidth]{figures/foundation_dataset_examples.png}
 \caption{Biomedical image datasets used in the representation experiments.}
 \label{fig:dataset-examples}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/bloodmnist_mixed_raw_clip_dino_cnn_gauss5.png}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/pathmnist_sample_size_vs_cnn.png}
+\end{minipage}
+\caption{BloodMNIST and PathMNIST representation experiments.}
+\label{fig:blood-path-app}
 \end{figure}
 
 \begin{table}[H]
