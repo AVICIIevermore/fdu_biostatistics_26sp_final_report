@@ -28,6 +28,12 @@
 \newcommand{\If}[1]{\par\noindent\textbf{if} #1 \textbf{then}}
 \newcommand{\EndIf}{\par\noindent\textbf{end if}}
 \newcommand{\Comment}[1]{\hfill{\(\triangleright\) #1}}
+\renewenvironment{abstract}{%
+  \begin{center}
+  \bfseries\abstractname
+  \end{center}
+  \small\noindent\ignorespaces
+}{\par\normalsize}
 
 \hypersetup{
   colorlinks=true,
@@ -63,15 +69,11 @@ The hypotheses are
 \[
 H_0:P=Q,\qquad H_1:P\ne Q.
 \]
-This problem is common in biomedical studies because group differences can be multivariate and structured. In gene expression, microbiome profiles, single-cell measurements, and biomedical images, the difference between two populations may appear as a change in mixture composition, covariance, morphology, or a small subpopulation. A useful test should therefore be nonparametric, valid under the null, and sensitive to alternatives that are hard to specify in advance.
+This problem is common in biomedical studies because group differences are often multivariate: a change in mixture composition, covariance, morphology, sparsity, or a small subpopulation. Classical one-dimensional tests such as Wilcoxon, Wald-Wolfowitz, and Kolmogorov-Smirnov are useful for ordered data, but they do not directly handle high-dimensional biomedical measurements. Graph-based and distance-based tests extend the problem to multivariate samples through constructions such as minimum-spanning-tree tests and energy-distance statistics \cite{friedman1979,sejdinovic2013}. Their power still depends on whether the chosen distance reflects the scientific difference.
 
-Classical one-dimensional tests such as Wilcoxon, Wald-Wolfowitz, and Kolmogorov-Smirnov are interpretable, but they are mainly designed for ordered observations. Graph-based and distance-based methods extend two-sample testing to multivariate data through constructions such as minimum-spanning-tree tests and energy-distance statistics \cite{friedman1979,sejdinovic2013}. These methods can work well when the distance captures the scientific difference, but distance geometry can become unreliable in high-dimensional or noisy settings, especially when nuisance variation dominates the signal.
+Kernel maximum mean discrepancy (MMD) compares the mean embeddings of \(P\) and \(Q\) in a reproducing kernel Hilbert space. With characteristic kernels, population MMD is zero exactly when \(P=Q\) \cite{gretton2012}. The main practical issue is bandwidth choice: a kernel that is too local or too global can lose finite-sample power. Recent work either learns or selects kernels, with sample splitting needed to preserve Type-I control \cite{liu2020}, or aggregates multiple kernels as in MMDAgg \cite{schrab2023}. MMMD takes the aggregation route and weights correlated MMD estimates through their covariance matrix \cite{chatterjee2025}.
 
-Kernel two-sample tests based on maximum mean discrepancy (MMD) give a flexible way to compare distributions. MMD compares the mean embeddings of \(P\) and \(Q\) in a reproducing kernel Hilbert space. With characteristic kernels, population MMD is zero exactly when \(P=Q\) \cite{gretton2012}. The practical difficulty is bandwidth choice. The median heuristic is convenient, but finite-sample power can change sharply with the kernel and its scale. This issue is especially visible in biomedical image tasks because the same biological difference may look small or large depending on whether the observations are represented as raw pixels, CNN features, or pretrained foundation-model embeddings.
-
-Recent work improves kernel two-sample testing in two main ways. One line learns or selects kernels to increase power, but selection can disturb Type-I error control if the same data are used for tuning and testing; data splitting avoids that problem but spends samples on selection \cite{liu2020}. Another line aggregates multiple kernels, such as MMDAgg, to reduce dependence on a single bandwidth \cite{schrab2023}. Chatterjee and Bhattacharya's MMMD follows the aggregation idea but uses the covariance structure among multiple MMD estimates \cite{chatterjee2025}. Instead of asking which bandwidth is best, MMMD asks how to combine several correlated kernel discrepancies into one calibrated statistic.
-
-Our experiments add a representation-level question. When the observations are images, how much of the two-sample power comes from the test statistic, and how much comes from the representation? We keep the testing layer fixed when possible and vary the representation across raw pixels, CLIP, DINOv2, and task-trained CNN features. This separation matters because poor image geometry can make a good kernel test look weak, while a good embedding can make a biologically meaningful difference easier for MMMD to detect.
+This report follows that view and asks two extension questions. First, can the covariance layer be made faster and more stable without changing the MMMD testing principle? Second, for biomedical images, how much of MMMD power comes from the test statistic and how much from the representation used before testing?
 
 
 \section{The MMMD method of the reviewed paper}
