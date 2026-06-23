@@ -15,8 +15,11 @@
 \usepackage{float}
 \usepackage{hyperref}
 \usepackage{xcolor}
+\usepackage{etoolbox}
 \usepackage{caption}
 \captionsetup{justification=centering,singlelinecheck=false}
+\captionsetup[table]{font=footnotesize,skip=4pt}
+\AtBeginEnvironment{table}{\scriptsize}
 
 \newenvironment{algorithm}[1][]{\begin{figure}[H]\small}{\end{figure}}
 \newenvironment{algorithmic}[1][]{\begin{quote}\small}{\end{quote}}
@@ -101,7 +104,7 @@ Thus an arithmetic $t$-grid needs only $2R-1$ cached product kernels instead of 
 \centering
 \caption{Main computational effect of NEW-MMMD. Here $R$ is the candidate kernel count, $q$ is the number selected by pivoted Cholesky, $m$ is the sample size, and $B$ is the number of bootstrap draws.}
 \label{tab:newmmmd-main-complexity}
-\small
+\scriptsize
 \begin{tabular}{lcc}
 \toprule
 Stage & Paper/naive MMMD & NEW-MMMD \\
@@ -120,7 +123,7 @@ Table~\ref{tab:newmmmd-main-evidence} collects the headline checks. The fast cov
 \centering
 \caption{Representative empirical evidence for NEW-MMMD. Timing uses the synthetic $n=700$ experiment; calibration and conditioning use the raw-pixel PathMNIST matched null at $n=120$.}
 \label{tab:newmmmd-main-evidence}
-\small
+\scriptsize
 \setlength{\tabcolsep}{5pt}
 \begin{tabular}{lcc}
 \toprule
@@ -198,7 +201,7 @@ MNIST additive-noise experiments served as an initial implementation check and s
 \centering
 \caption{Representative PathMNIST rejection rates. The class-mixture null compares \texttt{mix635} with itself. Center-shift alternatives compare source-holdout and external images within the same tissue label.}
 \label{tab:dechao-main-rejection}
-\small
+\scriptsize
 \setlength{\tabcolsep}{4.2pt}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{llrrrr}
@@ -248,7 +251,7 @@ so the residual component is not used by the final linear classifier. This decom
 \centering
 \caption{Representative rejection rates from the centered semantic/residual decomposition.}
 \label{tab:dechao-semantic-residual}
-\small
+\scriptsize
 \setlength{\tabcolsep}{7pt}
 \begin{tabular}{lccc}
 \toprule
@@ -297,7 +300,7 @@ We report empirical power under mixture alternatives and empirical Type-I error 
 \centering
 \caption{Summary of the four representation experiments.}
 \label{tab:foundation-exp-summary}
-\footnotesize
+\scriptsize
 \setlength{\tabcolsep}{3pt}
 \begin{tabular}{>{\raggedright\arraybackslash}p{0.18\textwidth}
                 >{\raggedright\arraybackslash}p{0.15\textwidth}
@@ -449,7 +452,7 @@ where $d$ is the data dimension and $B$ is the number of bootstrap draws. The si
 \centering
 \caption{Per-iteration cost of building the covariance and running the bootstrap, for $R$ candidate kernels, $q$ selected kernels, $m$ samples, and $B$ bootstrap draws.}
 \label{tab:app-newmmmd-complexity}
-\small
+\scriptsize
 \begin{tabular}{lcc}
 \toprule
 Stage & Paper (naive) & NEW-MMMD \\
@@ -498,7 +501,7 @@ Table~\ref{tab:app-newmmmd-power} reports power against sample size (10 replicat
 \centering
 \caption{Mean power on the synthetic Gaussian scale shift ($d=2$, $\sigma_{\mathrm{mult}}=1.25$, $\alpha=0.05$, 10 replicates).}
 \label{tab:app-newmmmd-power}
-\small
+\scriptsize
 \begin{tabular}{rccc}
 \toprule
 $n$ & GAUSS single & GEXP MMMD & NEW MMMD \\
@@ -525,7 +528,7 @@ Here $d=5$, $X\sim\mathcal{N}(0,I_5)$, $Y\sim\mathcal{N}(0,1.2\,I_5)$, $n\in\{50
 \centering
 \caption{Covariance-build time per iteration at $n=700$.}
 \label{tab:app-cov-time}
-\small
+\scriptsize
 \begin{tabular}{lcc}
 \toprule
 Method & $t_{\mathrm{cov}}$ (s) & Relative \\
@@ -541,7 +544,7 @@ NEW-25       & 1.86  & $0.114\times$ \\
 \centering
 \caption{End-to-end time per iteration at $n=700$.}
 \label{tab:app-total-time}
-\small
+\scriptsize
 \begin{tabular}{lcc}
 \toprule
 Method & $t_{\mathrm{total}}$ (s) & Relative \\
@@ -561,7 +564,7 @@ At matched $R=13$, NEW-13 builds the covariance about $16\times$ faster than the
 \centering
 \caption{Power in the time-complexity study ($d=5$, variance shift $1.2$, $\alpha=0.05$).}
 \label{tab:app-time-power}
-\small
+\scriptsize
 \begin{tabular}{rcccc}
 \toprule
 $n$ & GEXP-5 & GEXP-rich-13 & NEW-13 & NEW-25 \\
@@ -586,7 +589,7 @@ This setting is the main test of the stability claim. The data are raw-pixel Pat
 \centering
 \caption{PathMNIST raw-pixel two-sample test. For NEW-MMMD, condition numbers are for the $q\times q$ submatrix actually inverted. The ridge is $\lambda=10^{-5}\cdot\min_i\widehat{\Sigma}_{ii}$ (median $\lambda\approx 2\times 10^{-7}$).}
 \label{tab:app-pathmnist}
-\small
+\scriptsize
 \setlength{\tabcolsep}{4.5pt}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{llrrrrrr}
@@ -612,7 +615,7 @@ The matched null is decisive. GEXP-5 has a Type-I error near $0.10$, twice the n
 \centering
 \caption{Size-corrected power (alternative power minus matched-null Type-I error).}
 \label{tab:app-pathmnist-sizecorr}
-\small
+\scriptsize
 \begin{tabular}{rcc}
 \toprule
 $n$ & GEXP-5 & NEW-MMMD \\
@@ -633,7 +636,7 @@ Repeating the PathMNIST study under a more aggressive rule, $\lambda=10^{-4}\cdo
 \centering
 \caption{Effect of the ridge rule on the PathMNIST study. Type-I entries are at $n=60\,/\,120$; size-corrected power likewise.}
 \label{tab:app-ridge}
-\small
+\scriptsize
 \begin{tabular}{lcc}
 \toprule
 Quantity & $\lambda=10^{-5}\cdot\min$ & $\lambda=10^{-4}\cdot\operatorname{mean}$ \\
@@ -782,7 +785,7 @@ Overall, these numerical extensions show that the Mahalanobis aggregation strate
 \section{Detailed CNN-MMMD component figures}
 \label{app:dechao-cnn-mmmd}
 \captionsetup[figure]{font=small,skip=4pt}
-\captionsetup[table]{font=small,skip=4pt}
+\captionsetup[table]{font=footnotesize,skip=4pt}
 
 This appendix collects the figures supporting Section~\ref{sec:cnn-mmmd}. Related panels are grouped so that each subsection corresponds to one step of the analysis: initial validation, PathMNIST power and calibration, same-label center shift, semantic/residual decomposition, and color/stain controls.
 
@@ -794,7 +797,7 @@ Formal PathMNIST power and internal-null analyses used 10 outer repetitions, 500
 \centering
 \caption{Role of each experimental stage in the CNN-MMMD analysis.}
 \label{tab:app-dechao-ledger}
-\small
+\scriptsize
 \setlength{\tabcolsep}{5pt}
 \begin{tabular}{>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.69\textwidth}}
 \toprule
