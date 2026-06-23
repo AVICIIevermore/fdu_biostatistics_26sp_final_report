@@ -18,6 +18,7 @@
 \usepackage{etoolbox}
 \usepackage{caption}
 \captionsetup{justification=centering,singlelinecheck=false}
+\captionsetup[figure]{font=footnotesize,skip=4pt}
 \captionsetup[table]{font=footnotesize,skip=4pt}
 \AtBeginEnvironment{table}{\scriptsize}
 
@@ -784,7 +785,7 @@ Overall, these numerical extensions show that the Mahalanobis aggregation strate
 \clearpage
 \section{Detailed CNN-MMMD component figures}
 \label{app:dechao-cnn-mmmd}
-\captionsetup[figure]{font=small,skip=4pt}
+\captionsetup[figure]{font=footnotesize,skip=4pt}
 \captionsetup[table]{font=footnotesize,skip=4pt}
 
 This appendix collects the figures supporting Section~\ref{sec:cnn-mmmd}. Related panels are grouped so that each subsection corresponds to one step of the analysis: initial validation, PathMNIST power and calibration, same-label center shift, semantic/residual decomposition, and color/stain controls.
