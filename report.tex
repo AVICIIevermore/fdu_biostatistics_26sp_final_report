@@ -77,11 +77,55 @@ The bottleneck is the covariance matrix. Its entries are Frobenius inner product
 \section{NEW-MMMD: stabilizing and accelerating the covariance}
 \label{sec:newmmmd}
 
-NEW-MMMD first prunes the candidate kernel grid by lazy pivoted Cholesky. At each step, the algorithm selects the kernel with the largest unexplained residual and stops when the largest relative residual falls below $\varepsilon$. The selected set $S$ has $q\ll R$ numerically independent kernels, and both the statistic and bootstrap cut-off are recomputed on $\widehat{\Sigma}_{S,S}$. Thus pruning becomes part of the calibrated test rather than a post-hoc diagnostic; Appendix~\ref{app:newmmmd-algorithm} gives the pseudocode.
+This section presents our own methodological extension to the reviewed paper, rather than part of the original MMMD method. NEW-MMMD first prunes the candidate kernel grid by lazy pivoted Cholesky. At each step, the algorithm selects the kernel with the largest unexplained residual and stops when the largest relative residual falls below $\varepsilon$. The selected set $S$ has $q<R$ numerically independent kernels, and both the statistic and bootstrap cut-off are recomputed on $\widehat{\Sigma}_{S,S}$. Thus pruning becomes part of the calibrated test rather than a post-hoc diagnostic; Appendix~\ref{app:newmmmd-algorithm} gives the full pseudocode.
 
-NEW-MMMD also exploits Gaussian and Laplace multiplicative closure. After reparameterizing by $t=1/\sigma^2$ for Gaussian kernels or $t=1/\sigma$ for Laplace kernels, products stay in the same family with parameter $t_a+t_b$. On an arithmetic $t$-grid, only $2R-1$ distinct sums must be cached, so covariance construction avoids the full $R^2$ set of repeated sample scans; after selection, bootstrap work scales with $q$ rather than $R$. Appendix~\ref{app:newmmmd-complexity} gives the detailed cost table.
+NEW-MMMD also exploits Gaussian and Laplace multiplicative closure. After reparameterization, both families can be written as $K_t(x,y)=\exp\{-t d(x,y)\}$, with $t=1/\sigma^2$ for Gaussian kernels and $t=1/\sigma$ for Laplace kernels. The covariance and product identities are
+\[
+  \widehat{\Sigma}_{ab}\propto \langle C K_{t_a} C, C K_{t_b} C\rangle_F,
+  \qquad K_{t_a}\circ K_{t_b}=K_{t_a+t_b}.
+\]
+Thus an arithmetic $t$-grid needs only $2R-1$ cached product kernels instead of $R^2$ repeated sample scans. After Cholesky selection, the multiplier bootstrap uses only the $q$ retained kernels. Table~\ref{tab:newmmmd-main-complexity} summarizes the resulting change in computational order; the derivation and implementation details are in Appendix~\ref{app:newmmmd-complexity}.
 
-The appendix experiments show that the fast covariance agrees with the naive estimator to machine precision. NEW-MMMD stays within four percentage points of the paper's GEXP MMMD on Gaussian scale shifts, and its main advantage is stability: in a high-dimensional raw-pixel PathMNIST null, GEXP-5 rejects at about $0.10$ while NEW-MMMD stays near $0.05$ after pruning to a well-conditioned $4\times4$ or $5\times5$ block. In short, NEW-MMMD most reliably improves calibration and scalability; power gains depend on the kernel grid.
+\begin{table}[H]
+\centering
+\caption{Main computational effect of NEW-MMMD. Here $R$ is the candidate kernel count, $q$ is the number selected by pivoted Cholesky, $m$ is the sample size, and $B$ is the number of bootstrap draws.}
+\label{tab:newmmmd-main-complexity}
+\small
+\begin{tabular}{lcc}
+\toprule
+Stage & Paper/naive MMMD & NEW-MMMD \\
+\midrule
+Covariance build & $O(R^2m^3)$ & $O(Rm^2)$ \\
+Kernel selection & --- & $O(Rq^2)$ \\
+Bootstrap & $O(BRm^2)$ & $O(Bqm^2)$ \\
+Matrix inverted & $R\times R$ & $q\times q$, usually $q<R$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:newmmmd-main-evidence} collects the headline checks. The fast covariance matches the naive estimator to about $8.3\times10^{-16}$, but at matched $R=13$ it builds the covariance about $16\times$ faster and is $4.8\times$ faster end to end. On the raw-pixel PathMNIST null, GEXP-5 rejects at about twice the nominal level, while NEW-MMMD stays near $0.05$ after pruning to a well-conditioned $4\times4$ or $5\times5$ block; size-corrected power is then essentially tied.
+
+\begin{table}[H]
+\centering
+\caption{Representative empirical evidence for NEW-MMMD. Timing uses the synthetic $n=700$ experiment; calibration and conditioning use the raw-pixel PathMNIST matched null at $n=120$.}
+\label{tab:newmmmd-main-evidence}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lcc}
+\toprule
+Quantity & Paper/naive benchmark & NEW-MMMD \\
+\midrule
+Covariance-build time & 16.37 s (GEXP-rich-13) & 1.04 s (NEW-13) \\
+End-to-end time & 28.49 s (GEXP-rich-13) & 5.90 s (NEW-13) \\
+Matched-null Type-I & 0.106 (GEXP-5) & 0.040 \\
+Condition number inverted & $2.47\times10^5$ (GEXP-5) & $4.19\times10^4$ \\
+Size-corrected power & 0.304 (GEXP-5) & 0.286 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+In short, NEW-MMMD makes the covariance layer faster and more stable while keeping the same MMMD testing principle. Its power gains depend on the kernel grid, but its scalability and Type-I calibration are the main advantages over the original implementation.
+
 \section{Numerical extensions to the MMMD framework}
 
 \subsection{Motivation and experimental setup}
@@ -292,6 +336,315 @@ These experiments are still limited by computational resources and time. The mai
 
 \clearpage
 \appendix
+\section{NEW-MMMD: detailed numerical experiments}
+\label{app:newmmmd}
+
+This appendix details the experiments behind Section~\ref{sec:newmmmd}. Three settings are used: a reproduction of the paper's Figure~1(b) on synthetic Gaussian scale shifts that checks power parity, a time-complexity study that isolates the covariance speed-up, and a high-dimensional PathMNIST two-sample test that exposes the ill-conditioning the method targets.
+
+\subsection{Algorithm and cost details}
+\label{app:newmmmd-algorithm}
+\label{app:newmmmd-complexity}
+
+This subsection gives the details suppressed from the main text. Write $\widetilde{K}_a=C_m\widehat{K}_aC_m$ for the centered Gram matrix of kernel $a$ on the $X$ sample. Up to the constant factor in the paper's covariance estimator,
+\[
+  \widehat{\Sigma}_{ab}\propto \langle \widetilde{K}_a,\widetilde{K}_b\rangle_F.
+\]
+Thus $\widehat{\Sigma}$ is a Gram matrix whose ``observations'' are themselves vectorized centered Gram matrices. If two bandwidths produce nearly identical similarity matrices, then $\operatorname{vec}(\widetilde{K}_a)$ and $\operatorname{vec}(\widetilde{K}_b)$ are nearly collinear, and the covariance matrix becomes ill-conditioned. NEW-MMMD removes these redundant directions before inversion.
+
+For a generic kernel family, define a covariance-column oracle
+\[
+  \mathcal{C}(p)=\widehat{\Sigma}_{\cdot,p}\in\mathbb{R}^{R}.
+\]
+The lazy pivoted-Cholesky selection uses this oracle rather than forming the whole $R\times R$ covariance matrix in advance. Its inputs are the candidate kernels $K_1,\ldots,K_R$, the diagonal entries $\widehat{\Sigma}_{jj}$, a relative tolerance $\varepsilon$, and optionally a maximum selected size $q_{\max}$. It returns a selected index set $S=\{p_1,\ldots,p_q\}$, a low-rank factor $L\in\mathbb{R}^{R\times q}$ describing the explained covariance geometry, and the selected covariance block $\widehat{\Sigma}_{S,S}$ used by the final MMMD statistic.
+
+Algorithm~\ref{alg:lazy-pchol} gives the selection step in pseudocode.
+
+\begin{algorithm}[H]
+\caption{Lazy pivoted-Cholesky kernel selection}
+\label{alg:lazy-pchol}
+\begin{algorithmic}[1]
+\Require Candidate kernels $K_1,\ldots,K_R$; diagonal entries $\widehat{\Sigma}_{jj}$; covariance-column oracle $\mathcal{C}(p)=\widehat{\Sigma}_{\cdot,p}$; tolerance $\varepsilon$; optional cap $q_{\max}$.
+\Ensure Selected kernel set $S$ and selected covariance block $\widehat{\Sigma}_{S,S}$.
+\State $S\gets\varnothing$, $L\gets$ empty matrix, $d_{\max}\gets\max_j\widehat{\Sigma}_{jj}$
+\For{$j=1,\ldots,R$}
+  \State $r_j\gets\widehat{\Sigma}_{jj}$
+\EndFor
+\For{$t=1,\ldots,q_{\max}$}
+  \State $p\gets\arg\max_{j\notin S} r_j$
+  \If{$r_p\le\varepsilon d_{\max}$}
+    \State \textbf{break}
+  \EndIf
+  \State $c\gets\mathcal{C}(p)$ \Comment{compute only the pivot column when needed}
+  \State append $p$ to $S$
+  \For{$j=1,\ldots,R$}
+    \State $L_{j,t}\gets\big(c_j-\sum_{s<t}L_{j,s}L_{p,s}\big)/\sqrt{r_p}$
+  \EndFor
+  \For{$j=1,\ldots,R$}
+    \State $r_j\gets r_j-L_{j,t}^2$
+  \EndFor
+\EndFor
+\State Form or recompute $\widehat{\Sigma}_{S,S}$ from the selected columns.
+\State Recompute the MMMD statistic and multiplier-bootstrap cut-off using only kernels in $S$.
+\end{algorithmic}
+\end{algorithm}
+The residual $r_j^{(t)}$ is the Schur-complement variance left after projecting kernel $j$ onto the span of the selected kernels. A small residual means that the corresponding centered Gram matrix contributes almost no new covariance direction, so removing it improves conditioning without discarding an independent scale. Selection is not followed by using the old critical value: both $T_{m,n}$ and the multiplier-bootstrap cut-off are recomputed on the selected kernel bank.
+
+For Gaussian and Laplace kernels the column oracle can be made much faster. Use the common parameterization
+\[
+  K_t(x,y)=\exp(-t d(x,y)),
+\]
+where $d(x,y)=\lVert x-y\rVert_2^2$ and $t=1/\sigma^2$ for Gaussian kernels, while $d(x,y)=\lVert x-y\rVert_2$ and $t=1/\sigma$ for Laplace kernels. Then
+\[
+  K_{t_a}(x,y)K_{t_b}(x,y)=K_{t_a+t_b}(x,y).
+\]
+This closure is useful because the centered Frobenius product can be expanded as
+\[
+  \langle C_mK_aC_m,C_mK_bC_m\rangle_F
+  =H(t_a+t_b)-\frac{2}{m}s_a^{\top}s_b+\frac{1}{m^2}S_aS_b,
+\]
+where
+\[
+  H(u)=\sum_{i,j=1}^{m}\exp(-uD_{ij}),\qquad
+  s_a=K_a\mathbf{1},\qquad
+  S_a=\mathbf{1}^{\top}K_a\mathbf{1}.
+\]
+Here $D_{ij}=d(X_i,X_j)$. On an arithmetic $t$-grid, $t_a+t_b$ has only $2R-1$ distinct values, so all needed $H(u)$ values can be cached with $O(Rm^2)$ sample-pair scans instead of recomputing a separate scan for each of the $R^2$ covariance pairs. The row-sum terms $s_a$ and $S_a$ are also cached; a lazy query for column $p$ then combines the stored $H(t_j+t_p)$ values with $s_j^{\top}s_p$ and $S_jS_p$ for all $j$. Algorithm~\ref{alg:closure-cov} records the full covariance construction; in the lazy version, the last loop is evaluated only for queried pivot columns.
+
+\begin{algorithm}[H]
+\caption{Closure-based covariance construction for Gaussian/Laplace kernels}
+\label{alg:closure-cov}
+\begin{algorithmic}[1]
+\Require Sample $X_1,\ldots,X_m$; parameters $t_1,\ldots,t_R$; distance $d(\cdot,\cdot)$; sample ratio $\widehat{\rho}$.
+\Ensure Covariance matrix $\widehat{\Sigma}$, or a column oracle $\mathcal{C}(p)$ for Algorithm~\ref{alg:lazy-pchol}.
+\State Compute $D_{ij}\gets d(X_i,X_j)$ for all $1\le i,j\le m$.
+\For{$a=1,\ldots,R$}
+  \State $K_a\gets[\exp(-t_aD_{ij})]_{i,j=1}^m$
+  \State $s_a\gets K_a\mathbf{1}$ and $S_a\gets\mathbf{1}^{\top}K_a\mathbf{1}$
+\EndFor
+\State $\mathcal{U}\gets\{t_a+t_b:1\le a\le b\le R\}$
+\For{$u\in\mathcal{U}$}
+  \State $H(u)\gets\sum_{i,j=1}^{m}\exp(-uD_{ij})$
+\EndFor
+\For{$a=1,\ldots,R$ and $b=1,\ldots,R$}
+  \State $I_{ab}\gets H(t_a+t_b)-2s_a^{\top}s_b/m+S_aS_b/m^2$
+  \State $\widehat{\Sigma}_{ab}\gets 2I_{ab}/\{\widehat{\rho}^{2}(1-\widehat{\rho})^{2}m^2\}$
+\EndFor
+\State Symmetrize $\widehat{\Sigma}\gets(\widehat{\Sigma}+\widehat{\Sigma}^{\top})/2$.
+\end{algorithmic}
+\end{algorithm}
+
+The resulting cost is summarized in Table~\ref{tab:app-newmmmd-complexity}. The generic lazy Cholesky part costs $O(Rq^2)$ in algebra after the covariance columns are available. With closure-based caching, the dominant covariance construction is $O(Rm^2)$ on an arithmetic grid, and the bootstrap stage uses only $q$ kernels. Keeping lower-order terms, the combined Gaussian/Laplace route is approximately
+\[
+  O(dm^2+Rm^2+qmR+Rq^2+Bqm^2+B\log B),
+\]
+where $d$ is the data dimension and $B$ is the number of bootstrap draws. The simplified message is that the expensive sample-pair work scales with $R$ during covariance construction and with $q$ during bootstrap, rather than with all $R^2$ covariance pairs and all $R$ kernels.
+
+\begin{table}[H]
+\centering
+\caption{Per-iteration cost of building the covariance and running the bootstrap, for $R$ candidate kernels, $q$ selected kernels, $m$ samples, and $B$ bootstrap draws.}
+\label{tab:app-newmmmd-complexity}
+\small
+\begin{tabular}{lcc}
+\toprule
+Stage & Paper (naive) & NEW-MMMD \\
+\midrule
+Covariance build & $O(R^2 m^3)$ & $O(R m^2)$ \\
+Kernel selection  & ---          & $O(R q^2)$ \\
+Bootstrap         & $O(B R m^2)$ & $O(B q m^2)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{figure}[H]
+\centering
+\begin{minipage}[t]{0.49\textwidth}
+  \centering
+  \includegraphics[width=\linewidth,height=0.30\textheight,keepaspectratio]{figures/Figure1b_with_NewMethod.pdf}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}
+  \centering
+  \includegraphics[width=\linewidth,height=0.30\textheight,keepaspectratio]{figures/TimeComparison_total.pdf}
+\end{minipage}
+\caption{NEW-MMMD on synthetic Gaussian scale shifts. Left: power versus sample size ($d=2$), matching the paper's multi-kernel test and beating single-kernel MMD. Right: time per iteration versus sample size ($d=5$), showing the covariance and end-to-end speed-ups at matched kernel count.}
+\label{fig:newmmmd-app}
+\end{figure}
+
+\subsection{Setup and implementation}
+
+The fast covariance of Fix~2 is implemented as a function \texttt{fast.cov.gaussian.t} and is compared against the paper's \texttt{est.cov}; pivoted-Cholesky selection (Fix~1) uses a relative tolerance $\varepsilon=10^{-4}$. Three methods are compared throughout the synthetic study: \textbf{GAUSS single}, a single Gaussian kernel with the median-heuristic squared bandwidth; \textbf{GEXP MMMD}, the paper's method with five Gaussian kernels on a geometric grid $\sigma^2=2^{l}\,t_{\mathrm{med}}$, $l\in\{-2,\dots,2\}$; and \textbf{NEW MMMD}, with $R=13$ Gaussian kernels on an arithmetic $t$-grid spanning $[0.25,4]\,t_{\mathrm{med}}$, the closure-based covariance, and pivoted-Cholesky selection. Unless noted, the ridge is $\lambda=10^{-5}\cdot\min_i\widehat{\Sigma}_{ii}$, matching the project R code.
+
+\subsection{Numerical correctness of the fast covariance}
+
+On Gaussian kernels the closure-based construction agrees with the naive estimator to machine precision,
+\[
+  \max_{a,b}\big|\widehat{\Sigma}^{\text{naive}}_{ab}-\widehat{\Sigma}^{\text{fast}}_{ab}\big|\approx 8.3\times 10^{-16},
+\]
+confirming that Fix~2 changes only the computational path, not the estimated matrix.
+
+\subsection{Stability of pivoted-Cholesky selection}
+
+At $n=200$ over 50 independent samples, selection kept $q=5$ kernels in 49 runs and $q=4$ once, out of $R=13$ candidates. On the arithmetic grid the procedure therefore compresses stably to about five numerically independent kernels, the same dimension as the paper's octave-spaced GEXP grid, so $\varepsilon=10^{-4}$ neither over-prunes nor leaves redundancy in this regime.
+
+\subsection{Power parity and the grid-centering effect}
+
+Table~\ref{tab:app-newmmmd-power} reports power against sample size (10 replicate power curves, $\alpha=0.05$); the corresponding curves are the left panel of Figure~\ref{fig:newmmmd-app}. Both MMMD methods clearly exceed the single-kernel baseline, and NEW MMMD stays within four percentage points of GEXP at every $n$, with overlapping $\pm 1$ standard-error bars.
+
+\begin{table}[H]
+\centering
+\caption{Mean power on the synthetic Gaussian scale shift ($d=2$, $\sigma_{\mathrm{mult}}=1.25$, $\alpha=0.05$, 10 replicates).}
+\label{tab:app-newmmmd-power}
+\small
+\begin{tabular}{rccc}
+\toprule
+$n$ & GAUSS single & GEXP MMMD & NEW MMMD \\
+\midrule
+50  & 0.081 & 0.196 & 0.179 \\
+100 & 0.126 & 0.243 & 0.202 \\
+200 & 0.231 & 0.360 & 0.348 \\
+300 & 0.386 & 0.503 & 0.485 \\
+400 & 0.520 & 0.657 & 0.627 \\
+500 & 0.620 & 0.725 & 0.704 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+NEW MMMD sits one to four points below GEXP systematically. The cause is grid design rather than the algorithm. GEXP's geometric grid is symmetric in log-scale about $t_{\mathrm{med}}$, whereas the arithmetic grid $[0.25,4]\,t_{\mathrm{med}}$ has arithmetic center $2.125\,t_{\mathrm{med}}$, already off the median bandwidth; pivoted Cholesky optimizes numerical independence, not sensitivity to the current alternative, so the selected kernels cover a wider range but sit slightly off the optimal bandwidth for a pure scale shift. Three simple remedies recover the gap: center the arithmetic grid on $t_{\mathrm{med}}$, switch to a geometric grid (the closure still applies, only the sharing of $H$ values is lost), or force $q_{\max}\ge 5$.
+
+\subsection{Time-complexity study}
+
+Here $d=5$, $X\sim\mathcal{N}(0,I_5)$, $Y\sim\mathcal{N}(0,1.2\,I_5)$, $n\in\{50,\dots,700\}$, with $n_{\mathrm{iter}}=200$ and $n_{\mathrm{rep}}=5$. Four methods are timed: GEXP-5, GEXP-rich-13 (the naive \texttt{est.cov} at $R=13$), NEW-13, and NEW-25. The corresponding plot is the right panel of Figure~\ref{fig:newmmmd-app}. Tables~\ref{tab:app-cov-time} and~\ref{tab:app-total-time} give the per-iteration covariance-build and end-to-end times at $n=700$.
+
+\begin{table}[H]
+\centering
+\begin{minipage}[t]{0.48\textwidth}
+\centering
+\caption{Covariance-build time per iteration at $n=700$.}
+\label{tab:app-cov-time}
+\small
+\begin{tabular}{lcc}
+\toprule
+Method & $t_{\mathrm{cov}}$ (s) & Relative \\
+\midrule
+GEXP-5       & 2.92  & $0.18\times$ \\
+GEXP-rich-13 & 16.37 & $1.00\times$ \\
+NEW-13       & 1.04  & $0.064\times$ \\
+NEW-25       & 1.86  & $0.114\times$ \\
+\bottomrule
+\end{tabular}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\textwidth}
+\centering
+\caption{End-to-end time per iteration at $n=700$.}
+\label{tab:app-total-time}
+\small
+\begin{tabular}{lcc}
+\toprule
+Method & $t_{\mathrm{total}}$ (s) & Relative \\
+\midrule
+GEXP-5       & 9.67  & $0.34\times$ \\
+GEXP-rich-13 & 28.49 & $1.00\times$ \\
+NEW-13       & 5.90  & $0.21\times$ \\
+NEW-25       & 6.28  & $0.22\times$ \\
+\bottomrule
+\end{tabular}
+\end{minipage}
+\end{table}
+
+At matched $R=13$, NEW-13 builds the covariance about $16\times$ faster than the naive estimator. Doubling the candidate count from 13 to 25 ($1.92\times$) raises $t_{\mathrm{cov}}$ from 1.04 to 1.86~s ($1.79\times$), confirming the near-linear dependence on $R$ predicted by Table~\ref{tab:app-newmmmd-complexity}, in contrast to the $R^2$ growth of the naive build. End to end, NEW-13 is $4.8\times$ faster than GEXP-rich-13 and $1.6\times$ faster than GEXP-5; even NEW-25, with five times the paper's kernel count, remains faster than GEXP-5. Power (Table~\ref{tab:app-time-power}) is within Monte Carlo noise of GEXP for $n\ge 300$; for $n\le 200$ it is five to eleven points lower, from the same grid-centering effect. At $n=50,100$ NEW is in fact slightly slower, because the fixed pre-computation (the pairwise distance matrix and row sums) is not yet amortized by the saved $O(R^2)$ matrix products; the cross-over is at $n\approx 200$ to $300$.
+
+\begin{table}[H]
+\centering
+\caption{Power in the time-complexity study ($d=5$, variance shift $1.2$, $\alpha=0.05$).}
+\label{tab:app-time-power}
+\small
+\begin{tabular}{rcccc}
+\toprule
+$n$ & GEXP-5 & GEXP-rich-13 & NEW-13 & NEW-25 \\
+\midrule
+50  & 0.268 & 0.314 & 0.181 & 0.169 \\
+100 & 0.347 & 0.359 & 0.260 & 0.213 \\
+200 & 0.571 & 0.570 & 0.496 & 0.460 \\
+300 & 0.759 & 0.758 & 0.731 & 0.665 \\
+400 & 0.865 & 0.863 & 0.851 & 0.818 \\
+500 & 0.950 & 0.931 & 0.931 & 0.901 \\
+600 & 0.974 & 0.969 & 0.959 & 0.946 \\
+700 & 0.986 & 0.989 & 0.984 & 0.982 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{High-dimensional real data: PathMNIST}
+
+This setting is the main test of the stability claim. The data are raw-pixel PathMNIST images flattened to $d=2352$, with two highly overlapping mixtures. Under the alternative (\texttt{mix635} vs \texttt{mix835}) the $X$ group draws classes $\{6,3,5\}$ and the $Y$ group draws $\{8,3,5\}$, with the shared classes sampled from disjoint pools. The matched null (\texttt{mix635} vs \texttt{mix635}) draws $\{6,3,5\}$ on both sides from disjoint pools, so the two samples are independent draws from the same structured mixture; its background ill-conditioning, median bandwidth, and dimension match the alternative, which makes its Type-I error directly comparable to the alternative power. We use $n\in\{60,120\}$, $n_{\mathrm{iter}}=500$, $n_{\mathrm{boot}}=200$, and $\alpha=0.05$, comparing GEXP-5 and NEW-MMMD under the $\lambda=10^{-5}\cdot\min$ ridge. Table~\ref{tab:app-pathmnist} collects the results.
+
+\begin{table}[H]
+\centering
+\caption{PathMNIST raw-pixel two-sample test. For NEW-MMMD, condition numbers are for the $q\times q$ submatrix actually inverted. The ridge is $\lambda=10^{-5}\cdot\min_i\widehat{\Sigma}_{ii}$ (median $\lambda\approx 2\times 10^{-7}$).}
+\label{tab:app-pathmnist}
+\small
+\setlength{\tabcolsep}{4.5pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrrrrr}
+\toprule
+Setting & Method & $n$ & power / Type-I & med.\ $q$ & med.\ cond($\widehat{\Sigma}$) & med.\ cond($\widehat{\Sigma}+\lambda I$) & runtime (s) \\
+\midrule
+H1: \texttt{mix635} vs \texttt{mix835} & GEXP-5   & 60  & 0.268 & 5 & $5.92\times10^{5}$ & $4.29\times10^{5}$ & 21.2 \\
+H1: \texttt{mix635} vs \texttt{mix835} & NEW-MMMD & 60  & 0.210 & 4 & $1.15\times10^{4}$ & $1.14\times10^{4}$ & 16.3 \\
+H1: \texttt{mix635} vs \texttt{mix835} & GEXP-5   & 120 & 0.410 & 5 & $2.60\times10^{5}$ & $2.13\times10^{5}$ & 61.3 \\
+H1: \texttt{mix635} vs \texttt{mix835} & NEW-MMMD & 120 & 0.326 & 5 & $4.85\times10^{4}$ & $4.65\times10^{4}$ & 57.8 \\
+\addlinespace[0.15em]
+H0: \texttt{mix635} vs \texttt{mix635} & GEXP-5   & 60  & 0.102 & 5 & $1.04\times10^{6}$ & $6.28\times10^{5}$ & 13.3 \\
+H0: \texttt{mix635} vs \texttt{mix635} & NEW-MMMD & 60  & 0.062 & 4 & $1.08\times10^{4}$ & $1.07\times10^{4}$ & 16.8 \\
+H0: \texttt{mix635} vs \texttt{mix635} & GEXP-5   & 120 & 0.106 & 5 & $3.03\times10^{5}$ & $2.47\times10^{5}$ & 60.3 \\
+H0: \texttt{mix635} vs \texttt{mix635} & NEW-MMMD & 120 & 0.040 & 5 & $4.33\times10^{4}$ & $4.19\times10^{4}$ & 54.6 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+The matched null is decisive. GEXP-5 has a Type-I error near $0.10$, twice the nominal level, and it does not improve from $n=60$ to $n=120$; the apparent power of $0.268$ and $0.410$ under the alternative therefore carries a constant inflation of about ten percent. NEW-MMMD has a Type-I error of $0.04$ to $0.06$. After pivoted Cholesky prunes the $13\times 13$ covariance to a $4\times 4$ or $5\times 5$ submatrix, the condition number of the inverted block falls to the $10^{4}$ range, one to two orders of magnitude below GEXP-5, so $\widehat{\Sigma}^{-1}$ no longer amplifies estimation noise along ill-conditioned directions and the null distribution returns to its intended shape. Subtracting the matched-null Type-I from the alternative power gives a size-corrected comparison (Table~\ref{tab:app-pathmnist-sizecorr}) in which the two methods are equal to within Monte Carlo error (about $0.02$); GEXP-5's nominal power advantage is borrowed from its inflated Type-I.
+
+\begin{table}[H]
+\centering
+\caption{Size-corrected power (alternative power minus matched-null Type-I error).}
+\label{tab:app-pathmnist-sizecorr}
+\small
+\begin{tabular}{rcc}
+\toprule
+$n$ & GEXP-5 & NEW-MMMD \\
+\midrule
+60  & $0.268-0.102=0.166$ & $0.210-0.062=0.148$ \\
+120 & $0.410-0.106=0.304$ & $0.326-0.040=0.286$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The fixed ridge cannot rescue GEXP-5 here: with $\lambda\approx 2.5\times10^{-7}$, far below the nonzero eigenvalues of $\widehat{\Sigma}$, the conditioned and unconditioned matrices differ by only 30 to 40 percent (Table~\ref{tab:app-pathmnist}). A larger ridge would lower the condition number but scale all directions equally, collapsing the Mahalanobis statistic toward a single-kernel average and discarding the variance normalization that motivates it. The redundancy is in the kernel-grid geometry, so it is removed at the construction layer by pruning rather than at the solve layer by a uniform ridge.
+
+\subsection{Sensitivity to the ridge rule}
+
+Repeating the PathMNIST study under a more aggressive rule, $\lambda=10^{-4}\cdot\operatorname{mean}_i\widehat{\Sigma}_{ii}$ (about $50\times$ larger), clarifies how the two stabilization mechanisms interact (Table~\ref{tab:app-ridge}). The larger ridge by itself repairs GEXP-5's Type-I error (to $0.06$ to $0.07$) but also lowers its raw power, because pushing $\widehat{\Sigma}+\lambda I$ toward $\lambda I$ degrades the Mahalanobis distance to an equally weighted norm. It also makes pivoted Cholesky stop pruning ($q=R=13$): adding $\lambda I$ lifts every diagonal residual above the relative threshold $\varepsilon$, so under this rule NEW-MMMD's calibration comes from the ridge rather than from selection.
+
+\begin{table}[H]
+\centering
+\caption{Effect of the ridge rule on the PathMNIST study. Type-I entries are at $n=60\,/\,120$; size-corrected power likewise.}
+\label{tab:app-ridge}
+\small
+\begin{tabular}{lcc}
+\toprule
+Quantity & $\lambda=10^{-5}\cdot\min$ & $\lambda=10^{-4}\cdot\operatorname{mean}$ \\
+\midrule
+Median $\lambda$ magnitude        & ${\sim}2\times10^{-7}$ & ${\sim}10^{-5}$ \\
+GEXP-5 H0 Type-I                   & 0.10 / 0.11 & 0.06 / 0.07 \\
+NEW-MMMD median $q$                & 4--5 & 13 \\
+NEW-MMMD H0 Type-I                 & 0.06 / 0.04 & 0.06 / 0.05 \\
+Size-corrected power, GEXP-5       & 0.17 / 0.30 & 0.14 / 0.25 \\
+Size-corrected power, NEW-MMMD     & 0.15 / 0.29 & 0.17 / 0.31 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The two mechanisms are complementary. With a small ridge, pivoted Cholesky carries the calibration ($q=4$ to $5$, submatrix condition number ${\sim}10^{4}$); with a large ridge, the ridge carries it ($q=13$, condition number pushed from ${\sim}10^{10}$ to ${\sim}10^{5}$). NEW-MMMD is calibrated under either rule, whereas GEXP-5 has only the ridge path and is therefore sensitive to the choice of $\lambda$. In practice, to keep the interpretability of kernel selection one uses a small ridge and lets pivoted Cholesky prune; to align with an external baseline that fixes $\lambda=10^{-4}\cdot\operatorname{mean}$, NEW-MMMD still controls the level, but its selection step is then inactive.
+
+\clearpage
 \section{MMMD numerical extension: detailed figures and tables}
 \label{app:numext}
 
@@ -737,315 +1090,6 @@ Sample size & GEXP-5 power & NEW-MMMD power \\
 \caption{NEW-MMMD and GEXP-5 comparison across NCT-CRC representations.}
 \label{fig:newmmmd}
 \end{figure}
-
-\clearpage
-\section{NEW-MMMD: detailed numerical experiments}
-\label{app:newmmmd}
-
-This appendix details the experiments behind Section~\ref{sec:newmmmd}. Three settings are used: a reproduction of the paper's Figure~1(b) on synthetic Gaussian scale shifts that checks power parity, a time-complexity study that isolates the covariance speed-up, and a high-dimensional PathMNIST two-sample test that exposes the ill-conditioning the method targets.
-
-\subsection{Algorithm and cost details}
-\label{app:newmmmd-algorithm}
-\label{app:newmmmd-complexity}
-
-This subsection gives the details suppressed from the main text. Write $\widetilde{K}_a=C_m\widehat{K}_aC_m$ for the centered Gram matrix of kernel $a$ on the $X$ sample. Up to the constant factor in the paper's covariance estimator,
-\[
-  \widehat{\Sigma}_{ab}\propto \langle \widetilde{K}_a,\widetilde{K}_b\rangle_F.
-\]
-Thus $\widehat{\Sigma}$ is a Gram matrix whose ``observations'' are themselves vectorized centered Gram matrices. If two bandwidths produce nearly identical similarity matrices, then $\operatorname{vec}(\widetilde{K}_a)$ and $\operatorname{vec}(\widetilde{K}_b)$ are nearly collinear, and the covariance matrix becomes ill-conditioned. NEW-MMMD removes these redundant directions before inversion.
-
-For a generic kernel family, define a covariance-column oracle
-\[
-  \mathcal{C}(p)=\widehat{\Sigma}_{\cdot,p}\in\mathbb{R}^{R}.
-\]
-The lazy pivoted-Cholesky selection uses this oracle rather than forming the whole $R\times R$ covariance matrix in advance. Its inputs are the candidate kernels $K_1,\ldots,K_R$, the diagonal entries $\widehat{\Sigma}_{jj}$, a relative tolerance $\varepsilon$, and optionally a maximum selected size $q_{\max}$. It returns a selected index set $S=\{p_1,\ldots,p_q\}$, a low-rank factor $L\in\mathbb{R}^{R\times q}$ describing the explained covariance geometry, and the selected covariance block $\widehat{\Sigma}_{S,S}$ used by the final MMMD statistic.
-
-Algorithm~\ref{alg:lazy-pchol} gives the selection step in pseudocode.
-
-\begin{algorithm}[H]
-\caption{Lazy pivoted-Cholesky kernel selection}
-\label{alg:lazy-pchol}
-\begin{algorithmic}[1]
-\Require Candidate kernels $K_1,\ldots,K_R$; diagonal entries $\widehat{\Sigma}_{jj}$; covariance-column oracle $\mathcal{C}(p)=\widehat{\Sigma}_{\cdot,p}$; tolerance $\varepsilon$; optional cap $q_{\max}$.
-\Ensure Selected kernel set $S$ and selected covariance block $\widehat{\Sigma}_{S,S}$.
-\State $S\gets\varnothing$, $L\gets$ empty matrix, $d_{\max}\gets\max_j\widehat{\Sigma}_{jj}$
-\For{$j=1,\ldots,R$}
-  \State $r_j\gets\widehat{\Sigma}_{jj}$
-\EndFor
-\For{$t=1,\ldots,q_{\max}$}
-  \State $p\gets\arg\max_{j\notin S} r_j$
-  \If{$r_p\le\varepsilon d_{\max}$}
-    \State \textbf{break}
-  \EndIf
-  \State $c\gets\mathcal{C}(p)$ \Comment{compute only the pivot column when needed}
-  \State append $p$ to $S$
-  \For{$j=1,\ldots,R$}
-    \State $L_{j,t}\gets\big(c_j-\sum_{s<t}L_{j,s}L_{p,s}\big)/\sqrt{r_p}$
-  \EndFor
-  \For{$j=1,\ldots,R$}
-    \State $r_j\gets r_j-L_{j,t}^2$
-  \EndFor
-\EndFor
-\State Form or recompute $\widehat{\Sigma}_{S,S}$ from the selected columns.
-\State Recompute the MMMD statistic and multiplier-bootstrap cut-off using only kernels in $S$.
-\end{algorithmic}
-\end{algorithm}
-The residual $r_j^{(t)}$ is the Schur-complement variance left after projecting kernel $j$ onto the span of the selected kernels. A small residual means that the corresponding centered Gram matrix contributes almost no new covariance direction, so removing it improves conditioning without discarding an independent scale. Selection is not followed by using the old critical value: both $T_{m,n}$ and the multiplier-bootstrap cut-off are recomputed on the selected kernel bank.
-
-For Gaussian and Laplace kernels the column oracle can be made much faster. Use the common parameterization
-\[
-  K_t(x,y)=\exp(-t d(x,y)),
-\]
-where $d(x,y)=\lVert x-y\rVert_2^2$ and $t=1/\sigma^2$ for Gaussian kernels, while $d(x,y)=\lVert x-y\rVert_2$ and $t=1/\sigma$ for Laplace kernels. Then
-\[
-  K_{t_a}(x,y)K_{t_b}(x,y)=K_{t_a+t_b}(x,y).
-\]
-This closure is useful because the centered Frobenius product can be expanded as
-\[
-  \langle C_mK_aC_m,C_mK_bC_m\rangle_F
-  =H(t_a+t_b)-\frac{2}{m}s_a^{\top}s_b+\frac{1}{m^2}S_aS_b,
-\]
-where
-\[
-  H(u)=\sum_{i,j=1}^{m}\exp(-uD_{ij}),\qquad
-  s_a=K_a\mathbf{1},\qquad
-  S_a=\mathbf{1}^{\top}K_a\mathbf{1}.
-\]
-Here $D_{ij}=d(X_i,X_j)$. On an arithmetic $t$-grid, $t_a+t_b$ has only $2R-1$ distinct values, so all needed $H(u)$ values can be cached with $O(Rm^2)$ sample-pair scans instead of recomputing a separate scan for each of the $R^2$ covariance pairs. The row-sum terms $s_a$ and $S_a$ are also cached; a lazy query for column $p$ then combines the stored $H(t_j+t_p)$ values with $s_j^{\top}s_p$ and $S_jS_p$ for all $j$. Algorithm~\ref{alg:closure-cov} records the full covariance construction; in the lazy version, the last loop is evaluated only for queried pivot columns.
-
-\begin{algorithm}[H]
-\caption{Closure-based covariance construction for Gaussian/Laplace kernels}
-\label{alg:closure-cov}
-\begin{algorithmic}[1]
-\Require Sample $X_1,\ldots,X_m$; parameters $t_1,\ldots,t_R$; distance $d(\cdot,\cdot)$; sample ratio $\widehat{\rho}$.
-\Ensure Covariance matrix $\widehat{\Sigma}$, or a column oracle $\mathcal{C}(p)$ for Algorithm~\ref{alg:lazy-pchol}.
-\State Compute $D_{ij}\gets d(X_i,X_j)$ for all $1\le i,j\le m$.
-\For{$a=1,\ldots,R$}
-  \State $K_a\gets[\exp(-t_aD_{ij})]_{i,j=1}^m$
-  \State $s_a\gets K_a\mathbf{1}$ and $S_a\gets\mathbf{1}^{\top}K_a\mathbf{1}$
-\EndFor
-\State $\mathcal{U}\gets\{t_a+t_b:1\le a\le b\le R\}$
-\For{$u\in\mathcal{U}$}
-  \State $H(u)\gets\sum_{i,j=1}^{m}\exp(-uD_{ij})$
-\EndFor
-\For{$a=1,\ldots,R$ and $b=1,\ldots,R$}
-  \State $I_{ab}\gets H(t_a+t_b)-2s_a^{\top}s_b/m+S_aS_b/m^2$
-  \State $\widehat{\Sigma}_{ab}\gets 2I_{ab}/\{\widehat{\rho}^{2}(1-\widehat{\rho})^{2}m^2\}$
-\EndFor
-\State Symmetrize $\widehat{\Sigma}\gets(\widehat{\Sigma}+\widehat{\Sigma}^{\top})/2$.
-\end{algorithmic}
-\end{algorithm}
-
-The resulting cost is summarized in Table~\ref{tab:app-newmmmd-complexity}. The generic lazy Cholesky part costs $O(Rq^2)$ in algebra after the covariance columns are available. With closure-based caching, the dominant covariance construction is $O(Rm^2)$ on an arithmetic grid, and the bootstrap stage uses only $q$ kernels. Keeping lower-order terms, the combined Gaussian/Laplace route is approximately
-\[
-  O(dm^2+Rm^2+qmR+Rq^2+Bqm^2+B\log B),
-\]
-where $d$ is the data dimension and $B$ is the number of bootstrap draws. The simplified message is that the expensive sample-pair work scales with $R$ during covariance construction and with $q$ during bootstrap, rather than with all $R^2$ covariance pairs and all $R$ kernels.
-
-\begin{table}[H]
-\centering
-\caption{Per-iteration cost of building the covariance and running the bootstrap, for $R$ candidate kernels, $q$ selected kernels, $m$ samples, and $B$ bootstrap draws.}
-\label{tab:app-newmmmd-complexity}
-\small
-\begin{tabular}{lcc}
-\toprule
-Stage & Paper (naive) & NEW-MMMD \\
-\midrule
-Covariance build & $O(R^2 m^3)$ & $O(R m^2)$ \\
-Kernel selection  & ---          & $O(R q^2)$ \\
-Bootstrap         & $O(B R m^2)$ & $O(B q m^2)$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-\begin{figure}[H]
-\centering
-\begin{minipage}[t]{0.49\textwidth}
-  \centering
-  \includegraphics[width=\linewidth,height=0.30\textheight,keepaspectratio]{figures/Figure1b_with_NewMethod.pdf}
-\end{minipage}\hfill
-\begin{minipage}[t]{0.49\textwidth}
-  \centering
-  \includegraphics[width=\linewidth,height=0.30\textheight,keepaspectratio]{figures/TimeComparison_total.pdf}
-\end{minipage}
-\caption{NEW-MMMD on synthetic Gaussian scale shifts. Left: power versus sample size ($d=2$), matching the paper's multi-kernel test and beating single-kernel MMD. Right: time per iteration versus sample size ($d=5$), showing the covariance and end-to-end speed-ups at matched kernel count.}
-\label{fig:newmmmd-app}
-\end{figure}
-
-\subsection{Setup and implementation}
-
-The fast covariance of Fix~2 is implemented as a function \texttt{fast.cov.gaussian.t} and is compared against the paper's \texttt{est.cov}; pivoted-Cholesky selection (Fix~1) uses a relative tolerance $\varepsilon=10^{-4}$. Three methods are compared throughout the synthetic study: \textbf{GAUSS single}, a single Gaussian kernel with the median-heuristic squared bandwidth; \textbf{GEXP MMMD}, the paper's method with five Gaussian kernels on a geometric grid $\sigma^2=2^{l}\,t_{\mathrm{med}}$, $l\in\{-2,\dots,2\}$; and \textbf{NEW MMMD}, with $R=13$ Gaussian kernels on an arithmetic $t$-grid spanning $[0.25,4]\,t_{\mathrm{med}}$, the closure-based covariance, and pivoted-Cholesky selection. Unless noted, the ridge is $\lambda=10^{-5}\cdot\min_i\widehat{\Sigma}_{ii}$, matching the project R code.
-
-\subsection{Numerical correctness of the fast covariance}
-
-On Gaussian kernels the closure-based construction agrees with the naive estimator to machine precision,
-\[
-  \max_{a,b}\big|\widehat{\Sigma}^{\text{naive}}_{ab}-\widehat{\Sigma}^{\text{fast}}_{ab}\big|\approx 8.3\times 10^{-16},
-\]
-confirming that Fix~2 changes only the computational path, not the estimated matrix.
-
-\subsection{Stability of pivoted-Cholesky selection}
-
-At $n=200$ over 50 independent samples, selection kept $q=5$ kernels in 49 runs and $q=4$ once, out of $R=13$ candidates. On the arithmetic grid the procedure therefore compresses stably to about five numerically independent kernels, the same dimension as the paper's octave-spaced GEXP grid, so $\varepsilon=10^{-4}$ neither over-prunes nor leaves redundancy in this regime.
-
-\subsection{Power parity and the grid-centering effect}
-
-Table~\ref{tab:app-newmmmd-power} reports power against sample size (10 replicate power curves, $\alpha=0.05$); the corresponding curves are the left panel of Figure~\ref{fig:newmmmd-app}. Both MMMD methods clearly exceed the single-kernel baseline, and NEW MMMD stays within four percentage points of GEXP at every $n$, with overlapping $\pm 1$ standard-error bars.
-
-\begin{table}[H]
-\centering
-\caption{Mean power on the synthetic Gaussian scale shift ($d=2$, $\sigma_{\mathrm{mult}}=1.25$, $\alpha=0.05$, 10 replicates).}
-\label{tab:app-newmmmd-power}
-\small
-\begin{tabular}{rccc}
-\toprule
-$n$ & GAUSS single & GEXP MMMD & NEW MMMD \\
-\midrule
-50  & 0.081 & 0.196 & 0.179 \\
-100 & 0.126 & 0.243 & 0.202 \\
-200 & 0.231 & 0.360 & 0.348 \\
-300 & 0.386 & 0.503 & 0.485 \\
-400 & 0.520 & 0.657 & 0.627 \\
-500 & 0.620 & 0.725 & 0.704 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-NEW MMMD sits one to four points below GEXP systematically. The cause is grid design rather than the algorithm. GEXP's geometric grid is symmetric in log-scale about $t_{\mathrm{med}}$, whereas the arithmetic grid $[0.25,4]\,t_{\mathrm{med}}$ has arithmetic center $2.125\,t_{\mathrm{med}}$, already off the median bandwidth; pivoted Cholesky optimizes numerical independence, not sensitivity to the current alternative, so the selected kernels cover a wider range but sit slightly off the optimal bandwidth for a pure scale shift. Three simple remedies recover the gap: center the arithmetic grid on $t_{\mathrm{med}}$, switch to a geometric grid (the closure still applies, only the sharing of $H$ values is lost), or force $q_{\max}\ge 5$.
-
-\subsection{Time-complexity study}
-
-Here $d=5$, $X\sim\mathcal{N}(0,I_5)$, $Y\sim\mathcal{N}(0,1.2\,I_5)$, $n\in\{50,\dots,700\}$, with $n_{\mathrm{iter}}=200$ and $n_{\mathrm{rep}}=5$. Four methods are timed: GEXP-5, GEXP-rich-13 (the naive \texttt{est.cov} at $R=13$), NEW-13, and NEW-25. The corresponding plot is the right panel of Figure~\ref{fig:newmmmd-app}. Tables~\ref{tab:app-cov-time} and~\ref{tab:app-total-time} give the per-iteration covariance-build and end-to-end times at $n=700$.
-
-\begin{table}[H]
-\centering
-\begin{minipage}[t]{0.48\textwidth}
-\centering
-\caption{Covariance-build time per iteration at $n=700$.}
-\label{tab:app-cov-time}
-\small
-\begin{tabular}{lcc}
-\toprule
-Method & $t_{\mathrm{cov}}$ (s) & Relative \\
-\midrule
-GEXP-5       & 2.92  & $0.18\times$ \\
-GEXP-rich-13 & 16.37 & $1.00\times$ \\
-NEW-13       & 1.04  & $0.064\times$ \\
-NEW-25       & 1.86  & $0.114\times$ \\
-\bottomrule
-\end{tabular}
-\end{minipage}\hfill
-\begin{minipage}[t]{0.48\textwidth}
-\centering
-\caption{End-to-end time per iteration at $n=700$.}
-\label{tab:app-total-time}
-\small
-\begin{tabular}{lcc}
-\toprule
-Method & $t_{\mathrm{total}}$ (s) & Relative \\
-\midrule
-GEXP-5       & 9.67  & $0.34\times$ \\
-GEXP-rich-13 & 28.49 & $1.00\times$ \\
-NEW-13       & 5.90  & $0.21\times$ \\
-NEW-25       & 6.28  & $0.22\times$ \\
-\bottomrule
-\end{tabular}
-\end{minipage}
-\end{table}
-
-At matched $R=13$, NEW-13 builds the covariance about $16\times$ faster than the naive estimator. Doubling the candidate count from 13 to 25 ($1.92\times$) raises $t_{\mathrm{cov}}$ from 1.04 to 1.86~s ($1.79\times$), confirming the near-linear dependence on $R$ predicted by Table~\ref{tab:app-newmmmd-complexity}, in contrast to the $R^2$ growth of the naive build. End to end, NEW-13 is $4.8\times$ faster than GEXP-rich-13 and $1.6\times$ faster than GEXP-5; even NEW-25, with five times the paper's kernel count, remains faster than GEXP-5. Power (Table~\ref{tab:app-time-power}) is within Monte Carlo noise of GEXP for $n\ge 300$; for $n\le 200$ it is five to eleven points lower, from the same grid-centering effect. At $n=50,100$ NEW is in fact slightly slower, because the fixed pre-computation (the pairwise distance matrix and row sums) is not yet amortized by the saved $O(R^2)$ matrix products; the cross-over is at $n\approx 200$ to $300$.
-
-\begin{table}[H]
-\centering
-\caption{Power in the time-complexity study ($d=5$, variance shift $1.2$, $\alpha=0.05$).}
-\label{tab:app-time-power}
-\small
-\begin{tabular}{rcccc}
-\toprule
-$n$ & GEXP-5 & GEXP-rich-13 & NEW-13 & NEW-25 \\
-\midrule
-50  & 0.268 & 0.314 & 0.181 & 0.169 \\
-100 & 0.347 & 0.359 & 0.260 & 0.213 \\
-200 & 0.571 & 0.570 & 0.496 & 0.460 \\
-300 & 0.759 & 0.758 & 0.731 & 0.665 \\
-400 & 0.865 & 0.863 & 0.851 & 0.818 \\
-500 & 0.950 & 0.931 & 0.931 & 0.901 \\
-600 & 0.974 & 0.969 & 0.959 & 0.946 \\
-700 & 0.986 & 0.989 & 0.984 & 0.982 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{High-dimensional real data: PathMNIST}
-
-This setting is the main test of the stability claim. The data are raw-pixel PathMNIST images flattened to $d=2352$, with two highly overlapping mixtures. Under the alternative (\texttt{mix635} vs \texttt{mix835}) the $X$ group draws classes $\{6,3,5\}$ and the $Y$ group draws $\{8,3,5\}$, with the shared classes sampled from disjoint pools. The matched null (\texttt{mix635} vs \texttt{mix635}) draws $\{6,3,5\}$ on both sides from disjoint pools, so the two samples are independent draws from the same structured mixture; its background ill-conditioning, median bandwidth, and dimension match the alternative, which makes its Type-I error directly comparable to the alternative power. We use $n\in\{60,120\}$, $n_{\mathrm{iter}}=500$, $n_{\mathrm{boot}}=200$, and $\alpha=0.05$, comparing GEXP-5 and NEW-MMMD under the $\lambda=10^{-5}\cdot\min$ ridge. Table~\ref{tab:app-pathmnist} collects the results.
-
-\begin{table}[H]
-\centering
-\caption{PathMNIST raw-pixel two-sample test. For NEW-MMMD, condition numbers are for the $q\times q$ submatrix actually inverted. The ridge is $\lambda=10^{-5}\cdot\min_i\widehat{\Sigma}_{ii}$ (median $\lambda\approx 2\times 10^{-7}$).}
-\label{tab:app-pathmnist}
-\small
-\setlength{\tabcolsep}{4.5pt}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{llrrrrrr}
-\toprule
-Setting & Method & $n$ & power / Type-I & med.\ $q$ & med.\ cond($\widehat{\Sigma}$) & med.\ cond($\widehat{\Sigma}+\lambda I$) & runtime (s) \\
-\midrule
-H1: \texttt{mix635} vs \texttt{mix835} & GEXP-5   & 60  & 0.268 & 5 & $5.92\times10^{5}$ & $4.29\times10^{5}$ & 21.2 \\
-H1: \texttt{mix635} vs \texttt{mix835} & NEW-MMMD & 60  & 0.210 & 4 & $1.15\times10^{4}$ & $1.14\times10^{4}$ & 16.3 \\
-H1: \texttt{mix635} vs \texttt{mix835} & GEXP-5   & 120 & 0.410 & 5 & $2.60\times10^{5}$ & $2.13\times10^{5}$ & 61.3 \\
-H1: \texttt{mix635} vs \texttt{mix835} & NEW-MMMD & 120 & 0.326 & 5 & $4.85\times10^{4}$ & $4.65\times10^{4}$ & 57.8 \\
-\addlinespace[0.15em]
-H0: \texttt{mix635} vs \texttt{mix635} & GEXP-5   & 60  & 0.102 & 5 & $1.04\times10^{6}$ & $6.28\times10^{5}$ & 13.3 \\
-H0: \texttt{mix635} vs \texttt{mix635} & NEW-MMMD & 60  & 0.062 & 4 & $1.08\times10^{4}$ & $1.07\times10^{4}$ & 16.8 \\
-H0: \texttt{mix635} vs \texttt{mix635} & GEXP-5   & 120 & 0.106 & 5 & $3.03\times10^{5}$ & $2.47\times10^{5}$ & 60.3 \\
-H0: \texttt{mix635} vs \texttt{mix635} & NEW-MMMD & 120 & 0.040 & 5 & $4.33\times10^{4}$ & $4.19\times10^{4}$ & 54.6 \\
-\bottomrule
-\end{tabular}}
-\end{table}
-
-The matched null is decisive. GEXP-5 has a Type-I error near $0.10$, twice the nominal level, and it does not improve from $n=60$ to $n=120$; the apparent power of $0.268$ and $0.410$ under the alternative therefore carries a constant inflation of about ten percent. NEW-MMMD has a Type-I error of $0.04$ to $0.06$. After pivoted Cholesky prunes the $13\times 13$ covariance to a $4\times 4$ or $5\times 5$ submatrix, the condition number of the inverted block falls to the $10^{4}$ range, one to two orders of magnitude below GEXP-5, so $\widehat{\Sigma}^{-1}$ no longer amplifies estimation noise along ill-conditioned directions and the null distribution returns to its intended shape. Subtracting the matched-null Type-I from the alternative power gives a size-corrected comparison (Table~\ref{tab:app-pathmnist-sizecorr}) in which the two methods are equal to within Monte Carlo error (about $0.02$); GEXP-5's nominal power advantage is borrowed from its inflated Type-I.
-
-\begin{table}[H]
-\centering
-\caption{Size-corrected power (alternative power minus matched-null Type-I error).}
-\label{tab:app-pathmnist-sizecorr}
-\small
-\begin{tabular}{rcc}
-\toprule
-$n$ & GEXP-5 & NEW-MMMD \\
-\midrule
-60  & $0.268-0.102=0.166$ & $0.210-0.062=0.148$ \\
-120 & $0.410-0.106=0.304$ & $0.326-0.040=0.286$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The fixed ridge cannot rescue GEXP-5 here: with $\lambda\approx 2.5\times10^{-7}$, far below the nonzero eigenvalues of $\widehat{\Sigma}$, the conditioned and unconditioned matrices differ by only 30 to 40 percent (Table~\ref{tab:app-pathmnist}). A larger ridge would lower the condition number but scale all directions equally, collapsing the Mahalanobis statistic toward a single-kernel average and discarding the variance normalization that motivates it. The redundancy is in the kernel-grid geometry, so it is removed at the construction layer by pruning rather than at the solve layer by a uniform ridge.
-
-\subsection{Sensitivity to the ridge rule}
-
-Repeating the PathMNIST study under a more aggressive rule, $\lambda=10^{-4}\cdot\operatorname{mean}_i\widehat{\Sigma}_{ii}$ (about $50\times$ larger), clarifies how the two stabilization mechanisms interact (Table~\ref{tab:app-ridge}). The larger ridge by itself repairs GEXP-5's Type-I error (to $0.06$ to $0.07$) but also lowers its raw power, because pushing $\widehat{\Sigma}+\lambda I$ toward $\lambda I$ degrades the Mahalanobis distance to an equally weighted norm. It also makes pivoted Cholesky stop pruning ($q=R=13$): adding $\lambda I$ lifts every diagonal residual above the relative threshold $\varepsilon$, so under this rule NEW-MMMD's calibration comes from the ridge rather than from selection.
-
-\begin{table}[H]
-\centering
-\caption{Effect of the ridge rule on the PathMNIST study. Type-I entries are at $n=60\,/\,120$; size-corrected power likewise.}
-\label{tab:app-ridge}
-\small
-\begin{tabular}{lcc}
-\toprule
-Quantity & $\lambda=10^{-5}\cdot\min$ & $\lambda=10^{-4}\cdot\operatorname{mean}$ \\
-\midrule
-Median $\lambda$ magnitude        & ${\sim}2\times10^{-7}$ & ${\sim}10^{-5}$ \\
-GEXP-5 H0 Type-I                   & 0.10 / 0.11 & 0.06 / 0.07 \\
-NEW-MMMD median $q$                & 4--5 & 13 \\
-NEW-MMMD H0 Type-I                 & 0.06 / 0.04 & 0.06 / 0.05 \\
-Size-corrected power, GEXP-5       & 0.17 / 0.30 & 0.14 / 0.25 \\
-Size-corrected power, NEW-MMMD     & 0.15 / 0.29 & 0.17 / 0.31 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The two mechanisms are complementary. With a small ridge, pivoted Cholesky carries the calibration ($q=4$ to $5$, submatrix condition number ${\sim}10^{4}$); with a large ridge, the ridge carries it ($q=13$, condition number pushed from ${\sim}10^{10}$ to ${\sim}10^{5}$). NEW-MMMD is calibrated under either rule, whereas GEXP-5 has only the ridge path and is therefore sensitive to the choice of $\lambda$. In practice, to keep the interpretability of kernel selection one uses a small ridge and lets pivoted Cholesky prune; to align with an external baseline that fixes $\lambda=10^{-4}\cdot\operatorname{mean}$, NEW-MMMD still controls the level, but its selection step is then inactive.
 
 \begin{thebibliography}{9}
 
