@@ -66,7 +66,7 @@
 \setlength{\textfloatsep}{5pt}
 \vspace{-1.0em}
 \begin{abstract}
-We review Mahalanobis aggregated maximum mean discrepancy (MMMD), a kernel two-sample test that combines correlated MMD statistics rather than selecting one bandwidth. The group reproduced the original testing framework and studied extensions involving covariance stabilization, alternative kernel constructions, and image representations. Across MNIST and biomedical image datasets, power depended on both the testing statistic and the feature space; the later sections therefore report power together with matched-null calibration and numerical diagnostics. Member contributions are Ruijie Li (Section~3, Appendix~A), Ziheng Zheng (Section~4, Appendix~B), Dechao Huang (Section~5, Appendix~C), and Yao Yu (Section~6, Appendix~D).
+We review Mahalanobis aggregated maximum mean discrepancy (MMMD), a kernel two-sample test that aggregates correlated MMD statistics instead of selecting one bandwidth. The group reproduced the original framework and studied extensions involving covariance stabilization, alternative kernel constructions, and image representations. Across synthetic, MNIST, and biomedical image experiments, performance depends on both the testing statistic and the feature space, so we report power together with matched-null calibration and numerical diagnostics. Member contributions are Ruijie Li (Section~3, Appendix~A), Ziheng Zheng (Section~4, Appendix~B), Dechao Huang (Section~5, Appendix~C), and Yao Yu (Section~6, Appendix~D). Code: \href{https://github.com/AVICIIevermore/Biostatistics_fdu_26}{AVICIIevermore/Biostatistics\_fdu\_26}.
 \end{abstract}
 \small
 \section{Background and motivation}
@@ -277,7 +277,15 @@ Testing-layer stabilization & NCT-CRC & GEXP-5 versus NEW-MMMD with fixed repres
 
 \textbf{Testing-layer stabilization.} The NEW-MMMD comparison shows that improving the testing layer mainly helps calibration and covariance conditioning; power gains still depend on the representation and sample size.
 
-\textbf{Limitations.} These experiments are limited by computational resources and time, so they focus on representative feature spaces rather than an exhaustive benchmark. Future work could test more foundation models, more medical datasets, richer class combinations, noise and domain-shift settings, and fine-tuned or domain-adapted encoders.
+\textbf{Limitations.} These experiments are limited by computational resources and time, so they focus on representative feature spaces rather than an exhaustive benchmark.
+
+\section{Conclusion}
+
+MMMD reframes bandwidth choice as covariance-weighted aggregation: several MMD components are combined after accounting for their dependence. In our experiments, this aggregation improves power over single-kernel MMD for several subtle alternatives, but its behavior cannot be judged from power alone. Calibration under matched nulls and the conditioning of the estimated covariance matrix are part of the testing procedure, not just numerical details.
+
+The numerical extensions show how the covariance layer affects the test in practice. NEW-MMMD keeps the original MMMD statistic but changes the covariance layer: pivoted-Cholesky selection removes redundant kernel directions, while Gaussian and Laplace closure reduce repeated covariance work. Within the tested Gaussian and PathMNIST settings, this gave faster covariance construction and better Type-I calibration after pruning. The additional MMMD experiments also separate the regimes where different kernel choices are more appropriate: GEXP works well with moderate kernel banks, LAP is more stable at larger banks, and graph kernels extend the same aggregation idea to diffusion geometry under the null settings we considered.
+
+The image experiments point to a second design choice: the representation can change what the kernel test detects. CNN features improved the PathMNIST class-mixture test, while the semantic and residual analysis traced one same-label signal mainly to color and staining variation. The frozen-encoder experiments did not produce a single best representation: supervised CNN features were stronger under heavy BloodMNIST noise, whereas DINOv2 improved with sample size on NCT-CRC. Overall, MMMD-style analyses should present power together with matched-null checks and representation diagnostics.
 
 \clearpage
 \appendix
