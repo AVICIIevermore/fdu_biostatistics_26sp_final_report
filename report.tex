@@ -1126,6 +1126,50 @@ Sample size & GEXP-5 power & NEW-MMMD power \\
 \label{fig:newmmmd}
 \end{figure}
 
+\section{Data Availability}
+\label{app:data-availability}
+
+All image datasets used in the experiments are publicly available. The local copies used for the analyses were organized under the project data directory, but the experiments can be reproduced from the following public sources.
+
+\begin{table}[H]
+\centering
+\caption{Public dataset sources used in this report.}
+\label{tab:data-availability}
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{p{0.18\textwidth}p{0.31\textwidth}p{0.43\textwidth}}
+\toprule
+Dataset & Use in this report & Public source \\
+\midrule
+MNIST
+& Initial image benchmark and additive-noise validation.
+& \url{https://yann.lecun.com/exdb/mnist/} \\
+\addlinespace
+MedMNIST
+& Parent benchmark collection for BloodMNIST and PathMNIST.
+& \url{https://medmnist.com/} \newline
+  \url{https://github.com/MedMNIST/MedMNIST} \\
+\addlinespace
+MedMNIST+
+& Source for higher-resolution MedMNIST variants, including BloodMNIST-224.
+& \url{https://zenodo.org/records/10519652} \\
+\addlinespace
+BloodMNIST-224
+& Blood-cell mixed-population experiments, noise robustness, and sample-size studies.
+& Distributed through MedMNIST/MedMNIST+. \\
+\addlinespace
+PathMNIST-28
+& Small pathology-patch experiments and reproduction-aligned mixture comparisons.
+& Distributed through MedMNIST/MedMNIST+. \\
+\addlinespace
+NCT-CRC-HE-100K
+& Large pathology-patch representation experiments and NEW-MMMD testing-layer comparison.
+& \url{https://zenodo.org/records/1214456} \newline
+  Mirror: \url{https://huggingface.co/datasets/DykeF/NCTCRCHE100K} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \begin{thebibliography}{9}
 
 \bibitem{banerjee2019}
