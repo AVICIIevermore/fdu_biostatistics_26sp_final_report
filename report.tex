@@ -170,7 +170,7 @@ Overall, multi-kernel MMMD outperforms single-kernel MMD for contamination, vari
 
 Kernel two-sample tests depend on both the kernel and the representation supplied to it. We therefore compared raw pixels with features from a small CNN trained once on an independent labelled split and then frozen. Tests used cached features only. The first representation was the 128-dimensional penultimate layer (FC-128). The second aggregated a shallow layer, an intermediate layer, and FC-128, using either one Gaussian kernel per layer (three MMD components) or five bandwidths per layer (15 components). MMMD combined the resulting layer--kernel discrepancies through its usual Mahalanobis statistic.
 
-MNIST additive-noise experiments provided an implementation check; PathMNIST then tested the same construction on colorectal histology images. In the class-mixture alternative, \texttt{mix635} and \texttt{mix835} shared labels 3 and 5 and differed by replacing label 6 with label 8. Formal PathMNIST runs used 10 outer repetitions, 500 independent tests per repetition, and 500 multiplier-bootstrap draws. Full power and null curves are reported in Appendix~\ref{app:dechao-cnn-mmmd}.
+MNIST additive-noise experiments provided an implementation check; PathMNIST then tested the same construction on colorectal histology images. In the class-mixture alternative, \texttt{mix635} and \texttt{mix835} shared labels 3 and 5 and differed by replacing label 6 with label 8. Formal PathMNIST runs used 10 outer repetitions, 500 independent tests per repetition, and 500 multiplier-bootstrap draws. Dataset links, full power, and null curves are in Appendix~\ref{app:dechao-cnn-mmmd}.
 
 \begin{figure}[H]
 \centering
@@ -279,14 +279,18 @@ Testing-layer stabilization & NCT-CRC & GEXP-5 versus NEW-MMMD with fixed repres
 
 \textbf{Limitations.} These experiments are limited by computational resources and time, so they focus on representative feature spaces rather than an exhaustive benchmark.
 
-\section{Conclusion}
+\begingroup
+\setstretch{1.03}
+\setlength{\parskip}{0.2ex plus 0.1ex minus 0.1ex}
+\section{Conclusion and future work}
 
-MMMD reframes bandwidth choice as covariance-weighted aggregation: several MMD components are combined after accounting for their dependence. In our experiments, this aggregation improves power over single-kernel MMD for several subtle alternatives, but its behavior cannot be judged from power alone. Calibration under matched nulls and the conditioning of the estimated covariance matrix are part of the testing procedure, not just numerical details.
+This report shows that the performance of kernel two-sample tests is determined jointly by the test statistic, the kernel family, and the representation of the observations. Across contamination, variance-scale, mixture, and graph-based experiments, Mahalanobis aggregation generally improved sensitivity over single-kernel MMD, particularly for subtle alternatives. However, large and redundant kernel banks could destabilize covariance estimation and inflate Type-I error. NEW-MMMD addressed this bottleneck through kernel pruning and accelerated covariance construction, improving conditioning and calibration while largely preserving power.
 
-The numerical extensions show how the covariance layer affects the test in practice. NEW-MMMD keeps the original MMMD statistic but changes the covariance layer: pivoted-Cholesky selection removes redundant kernel directions, while Gaussian and Laplace closure reduce repeated covariance work. Within the tested Gaussian and PathMNIST settings, this gave faster covariance construction and better Type-I calibration after pruning. The additional MMMD experiments also separate the regimes where different kernel choices are more appropriate: GEXP works well with moderate kernel banks, LAP is more stable at larger banks, and graph kernels extend the same aggregation idea to diffusion geometry under the null settings we considered.
+The image experiments extended MMMD beyond raw pixels. Task-trained CNN, multilayer CNN, CLIP, and DINOv2 features produced different power profiles on BloodMNIST, PathMNIST, and NCT-CRC, demonstrating that representation choice is part of the statistical design rather than a minor preprocessing decision. The PathMNIST same-label source-versus-external analysis also showed that a significant rejection does not necessarily indicate a biological class change. For label 8, much of the low-dimensional residual shift was associated with color and staining differences, illustrating the need to interpret the source of detected distributional changes.
 
-The image experiments point to a second design choice: the representation can change what the kernel test detects. CNN features improved the PathMNIST class-mixture test, while the semantic and residual analysis traced one same-label signal mainly to color and staining variation. The frozen-encoder experiments did not produce a single best representation: supervised CNN features were stronger under heavy BloodMNIST noise, whereas DINOv2 improved with sample size on NCT-CRC. Overall, MMMD-style analyses should present power together with matched-null checks and representation diagnostics.
+Future work should evaluate these methods on larger multi-center datasets with patient- or slide-level identifiers, allowing within-subject dependence to be handled through clustered resampling. Kernel and representation selection should also become adaptive without compromising Type-I control, for example through cross-fitting or independent tuning sets. Further studies could examine domain-adapted foundation encoders, richer graph constructions, and nuisance-adjusted tests that more explicitly separate biological variation from staining and acquisition effects. External validation will ultimately be needed to determine when improved statistical power translates into reproducible biomedical findings.
 
+\endgroup
 \clearpage
 \appendix
 \section{NEW-MMMD: detailed numerical experiments}
@@ -728,10 +732,19 @@ Overall, these numerical extensions show that the Mahalanobis aggregation strate
 \clearpage
 \section{Detailed CNN-MMMD methods and diagnostics}
 \label{app:dechao-cnn-mmmd}
+\begingroup
+\small
+\setlength{\parskip}{0.35ex plus 0.15ex minus 0.1ex}
+\setlength{\abovedisplayskip}{3pt}
+\setlength{\belowdisplayskip}{3pt}
+\setlength{\textfloatsep}{5pt plus 2pt minus 2pt}
+\setlength{\intextsep}{5pt plus 2pt minus 2pt}
 \captionsetup[figure]{font=small,skip=4pt}
 \captionsetup[table]{font=small,skip=4pt}
 
 This appendix documents the experimental design and calculations underlying Section~\ref{sec:cnn-mmmd}. It separates the main testing pipeline from the later diagnostic analyses so that the source of each reported number is explicit.
+
+\noindent\textbf{Datasets.} MNIST checks used the public 28-by-28 grayscale digit benchmark with 60,000 training and 10,000 test images, available from the \href{https://yann.lecun.com/exdb/mnist/}{official MNIST page}. The PathMNIST experiments used the public 28-by-28 RGB colorectal histology subset of MedMNIST v2, with 107,180 patches in nine tissue classes and train, validation, and test splits of 89,996, 10,004, and 7,180 images. PathMNIST was the real biomedical application for the class-mixture, source-vs-external, semantic/residual, and color-control analyses, and is accessible from the \href{https://medmnist.com/}{MedMNIST website} and its \href{https://github.com/MedMNIST/MedMNIST}{Python API}.
 
 \subsection{Data separation, run sizes, and leakage control}
 
@@ -743,9 +756,10 @@ Formal PathMNIST power and internal-null analyses used 10 outer repetitions, 500
 \centering
 \caption{Questions addressed by the CNN-MMMD experimental sequence.}
 \label{tab:app-dechao-ledger}
-\small
-\setlength{\tabcolsep}{5pt}
-\begin{tabular}{>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.69\textwidth}}
+\footnotesize
+\renewcommand{\arraystretch}{0.92}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.20\textwidth}>{\raggedright\arraybackslash}p{0.73\textwidth}}
 \toprule
 Stage & Experimental role \\
 \midrule
@@ -854,7 +868,7 @@ Numerically, $W_ch_{i,\mathrm{res}}$ was zero up to floating-point tolerance. MM
 
 Although $h_{\mathrm{sem}}$ and $h_{\mathrm{res}}$ are both stored as 128-dimensional vectors, their effective dimensions differ: $h_{\mathrm{sem}}$ lies in a rank-8 subspace, whereas the residual complement can contain roughly 120 directions. The dimension-matched control therefore projected residual features to eight dimensions in two ways. First, PCA was fitted on the pooled residual feature pool without using source/external labels and the leading eight scores were retained. Second, random orthonormal 8D projections were generated repeatedly; the reported random-8 result averages over 20 projections.
 
-A separate intrinsic-dimension analysis used a label-8-specific PCA basis and retained $k\in\{1,2,4,8,16,32\}$ components. Consequently, the 8D value in the dimension-matched control (0.965) and the $k=8$ value in the intrinsic-dimension curve (0.970) use different PCA bases and independent repeated tests. The difference of 0.005 corresponds to one rejection among 200 tests. Multiplier bootstrap remained the primary calibration; permutation cutoffs were computed only as a sensitivity check in selected cells.
+A separate intrinsic-dimension analysis used a label-8-specific PCA basis. It retained 1, 2, 4, 8, 16, and 32 components. Consequently, the 8D value in the dimension-matched control (0.965) and the $k=8$ value in the intrinsic-dimension curve (0.970) use different PCA bases and independent repeated tests. The difference of 0.005 corresponds to one rejection among 200 tests. Multiplier bootstrap remained the primary calibration; permutation cutoffs were computed only as a sensitivity check in selected cells.
 
 \begin{figure}[H]
 \centering
@@ -970,8 +984,9 @@ The matched alternative sampled one group from the matched source cohort and one
 
 \subsection{Scope of the image-level inference}
 
-All PathMNIST analyses are patch-level comparisons. Patient, slide, and scanner identifiers were not available in the packaged data used here, so the repeated-sampling calculations treat image patches as the observational units. Center-shift rejection therefore establishes a difference between the source and external patch distributions; it does not by itself identify a causal center effect or a patient-level biological difference. Likewise, color-score regression and propensity matching are diagnostic adjustments for measured RGB summaries, not a complete stain-normalization or causal mediation analysis.
+All PathMNIST analyses are patch-level comparisons because patient, slide, and scanner identifiers were unavailable in the packaged data. Center-shift rejection therefore establishes a source--external patch-distribution difference, not a causal center effect or patient-level biological difference. Color-score regression and propensity matching are diagnostic adjustments for measured RGB summaries, not stain normalization or causal mediation analysis.
 
+\endgroup
 \clearpage
 \section{Detailed representation experiment tables and figures}
 \label{app:repr}
