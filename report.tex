@@ -1,4 +1,4 @@
-\documentclass[11pt]{article}
+\documentclass[12pt]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{geometry}
@@ -58,36 +58,29 @@
 \begin{document}
 \maketitle
 
+\begingroup
+\setstretch{0.98}
+\setlength{\parskip}{0pt}
+\setlength{\abovedisplayskip}{3pt}
+\setlength{\belowdisplayskip}{3pt}
+\setlength{\textfloatsep}{5pt}
+\vspace{-1.0em}
 \begin{abstract}
-This report studies Mahalanobis maximum mean discrepancy (MMMD) for biomedical two-sample testing. We review the original method, which combines several kernel MMD statistics through an estimated covariance matrix instead of choosing one bandwidth. We then test extensions around computation, kernel design, and image representations. NEW-MMMD prunes redundant kernels with lazy pivoted Cholesky and uses Gaussian or Laplace closure to build the covariance faster; in our checks it improves conditioning and Type-I calibration while keeping similar size-corrected power. Synthetic experiments show that multi-kernel aggregation improves sensitivity to variance shifts, contamination, mixture changes, and graph-based alternatives. Image experiments on MNIST, PathMNIST, BloodMNIST, and NCT-CRC show that representation strongly affects power: CNN and DINOv2 features often improve on raw pixels, while CNN residual features can also capture color or stain-associated domain shifts.
+We review Mahalanobis aggregated maximum mean discrepancy (MMMD), a kernel two-sample test that combines correlated MMD statistics rather than selecting one bandwidth. The group reproduced the original testing framework and studied extensions involving covariance stabilization, alternative kernel constructions, and image representations. Across MNIST and biomedical image datasets, power depended on both the testing statistic and the feature space; the later sections therefore report power together with matched-null calibration and numerical diagnostics.
 \end{abstract}
+\small
+\section{Background and motivation}
+Given independent samples $X_1,\ldots,X_m\sim P$ and $Y_1,\ldots,Y_n\sim Q$, the two-sample problem tests $H_0:P=Q$ against $H_1:P\neq Q$. Biomedical alternatives need not be mean shifts: they may involve mixture proportions, covariance, rare subpopulations, morphology, or acquisition effects. Maximum mean discrepancy (MMD) compares the kernel mean embeddings of $P$ and $Q$ and is an omnibus test when a characteristic kernel is used \cite{gretton2012}. Its finite-sample power, however, can depend strongly on kernel bandwidth and, for images, on the representation supplied to the kernel. Kernel learning and aggregation address the first issue \cite{liu2020,schrab2023}; our experiments also examine the second by comparing raw measurements with learned features.
 
-\section{Background, motivation, and related work}
-
-The two-sample problem tests whether two samples are drawn from the same distribution. Let \(P\) and \(Q\) be two probability distributions on a sample space \(\mathcal{X}\), and suppose we observe independent samples
+\section{MMMD in the reviewed paper}
+For kernels $k_1,\ldots,k_R$, let $\widehat{\boldsymbol m}=(\widehat{\mathrm{MMD}}^2_{k_1},\ldots,\widehat{\mathrm{MMD}}^2_{k_R})^\top$ and let $\widehat\Sigma$ estimate their joint covariance. MMMD uses the Mahalanobis statistic
 \[
-\mathcal{X}_m=\{X_1,\ldots,X_m\}\sim P,\qquad
-\mathcal{Y}_n=\{Y_1,\ldots,Y_n\}\sim Q.
+T_{\mathrm{MMMD}}=\widehat{\boldsymbol m}^{\top}(\widehat\Sigma+\lambda I)^{-1}\widehat{\boldsymbol m},
 \]
-The hypotheses are
-\[
-H_0:P=Q,\qquad H_1:P\ne Q.
-\]
-This problem is common in biomedical studies because group differences are often multivariate: a change in mixture composition, covariance, morphology, sparsity, or a small subpopulation. Classical one-dimensional tests such as Wilcoxon, Wald-Wolfowitz, and Kolmogorov-Smirnov are useful for ordered data, but they do not directly handle high-dimensional biomedical measurements. Graph-based and distance-based tests extend the problem to multivariate samples through constructions such as minimum-spanning-tree tests and energy-distance statistics \cite{friedman1979,sejdinovic2013}. Their power still depends on whether the chosen distance reflects the scientific difference.
-
-Kernel maximum mean discrepancy (MMD) compares the mean embeddings of \(P\) and \(Q\) in a reproducing kernel Hilbert space. With characteristic kernels, population MMD is zero exactly when \(P=Q\) \cite{gretton2012}. The main practical issue is bandwidth choice: a kernel that is too local or too global can lose finite-sample power. Recent work either learns or selects kernels, with sample splitting needed to preserve Type-I control \cite{liu2020}, or aggregates multiple kernels as in MMDAgg \cite{schrab2023}. MMMD takes the aggregation route and weights correlated MMD estimates through their covariance matrix \cite{chatterjee2025}.
-
-This report follows that view and asks two extension questions. First, can the covariance layer be made faster and more stable without changing the MMMD testing principle? Second, for biomedical images, how much of MMMD power comes from the test statistic and how much from the representation used before testing?
-
-
-\section{The MMMD method of the reviewed paper}
-\label{sec:mmmd}
-
-Let $\mathcal{X}_m\sim P$ and $\mathcal{Y}_n\sim Q$. Kernel MMD tests $H_0:P=Q$ by comparing mean embeddings in an RKHS; with a characteristic kernel, population MMD is zero exactly under equality of distributions \cite{gretton2012}. The finite-sample weakness is bandwidth choice: a Gaussian kernel that is too local or too global can miss the alternative.
-
-Chatterjee and Bhattacharya \cite{chatterjee2025} avoid choosing one bandwidth by stacking the MMD estimates from $r$ kernels into $\widehat{\mathbf{m}}$ and using the Mahalanobis statistic $T_{m,n}=\widehat{\mathbf{m}}^{\top}(\widehat{\Sigma}+\lambda\mathbf{I})^{-1}\widehat{\mathbf{m}}$. The covariance weighting prevents correlated kernels from being counted as independent evidence, while a Gaussian multiplier bootstrap gives the rejection cut-off because the null limit has no closed-form quantiles. The method therefore keeps the omnibus consistency of MMD while reducing the single-bandwidth gamble.
-
-The bottleneck is the covariance matrix. Its entries are Frobenius inner products of centered Gram matrices, so redundant bandwidths create nearly collinear covariance directions, make $\widehat{\Sigma}$ ill-conditioned, and require many pairwise covariance computations. Section~\ref{sec:newmmmd} modifies this covariance layer while leaving the MMMD testing principle unchanged.
+with a multiplier bootstrap to estimate the null cutoff \cite{chatterjee2025}. The covariance weighting discounts redundant kernel components and combines discrepancies that are informative at different scales. The same mechanism also creates the principal practical limitation: with many highly correlated components and small samples, $\widehat\Sigma$ may be ill-conditioned and calibration may become unstable. The subsequent experiments retain this testing framework while studying covariance stabilization and alternative data representations.
+\normalsize
+\endgroup
+\clearpage
 
 \section{NEW-MMMD: stabilizing and accelerating the covariance}
 \label{sec:newmmmd}
@@ -178,112 +171,64 @@ Multi-kernel MMMD aggregation consistently outperforms single-kernel MMD across 
 \section{CNN representation-assisted MMMD for image two-sample testing}
 \label{sec:cnn-mmmd}
 
-Kernel two-sample tests depend not only on the choice of kernel, but also on the representation to which the kernel is applied. We therefore evaluated MMMD on learned CNN features in addition to raw pixels. A small CNN was trained once on an independent labelled split and then frozen. All subsequent tests used cached embeddings; the network was not updated using either two-sample test group.
+\begingroup
+\setlength{\textfloatsep}{7pt plus 2pt minus 2pt}
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
+\setlength{\abovedisplayskip}{5pt}
+\setlength{\belowdisplayskip}{5pt}
+\captionsetup{font=small,skip=3pt}
 
-Two representations were considered. The first was the 128-dimensional penultimate embedding (FC-128), immediately before the linear classifier. The second combined features from a shallow layer, an intermediate layer, and FC-128. For this multilayer representation, we used either one Gaussian kernel per layer, producing three MMD components, or five bandwidths per layer, producing 15 components. MMMD then aggregated these layer--kernel components through the same Mahalanobis statistic used in the original method.
+Kernel two-sample tests depend on both the kernel and the representation supplied to it. We therefore compared raw pixels with features from a small CNN trained once on an independent labelled split and then frozen. Tests used cached features only. The first representation was the 128-dimensional penultimate layer (FC-128). The second aggregated a shallow layer, an intermediate layer, and FC-128, using either one Gaussian kernel per layer (three MMD components) or five bandwidths per layer (15 components). MMMD combined the resulting layer--kernel discrepancies through its usual Mahalanobis statistic.
 
-MNIST additive-noise experiments served as an initial implementation check and showed that learned representations could improve power in selected noise settings without a corresponding increase in matched-null rejection. We next applied the same pipeline to PathMNIST. In the class-mixture experiment, \texttt{mix635} and \texttt{mix835} shared labels 3 and 5 but differed by replacing label 6 with label 8. Formal PathMNIST analyses used 10 outer repetitions, 500 independent tests per repetition, and 500 multiplier-bootstrap draws, giving 5000 tests per method and sample-size cell.
+MNIST additive-noise experiments provided an implementation check; PathMNIST then tested the same construction on colorectal histology images. In the class-mixture alternative, \texttt{mix635} and \texttt{mix835} shared labels 3 and 5 and differed by replacing label 6 with label 8. Formal PathMNIST runs used 10 outer repetitions, 500 independent tests per repetition, and 500 multiplier-bootstrap draws. Full power and null curves are reported in Appendix~\ref{app:dechao-cnn-mmmd}.
 
 \begin{figure}[H]
 \centering
-\begin{minipage}[t]{0.392\textwidth}
+\begin{minipage}[t]{0.48\textwidth}
 \centering
 \includegraphics[width=\linewidth]{figures/dechao_mnist_pilot_power_simple.png}
 \end{minipage}\hfill
-\begin{minipage}[t]{0.392\textwidth}
+\begin{minipage}[t]{0.48\textwidth}
 \centering
 \includegraphics[width=\linewidth]{figures/dechao_pathmnist_class_power_simple.png}
 \end{minipage}
-\caption{Power curves for the four representation choices used in CNN-MMMD. The paired panels emphasize FC-128 and multilayer embeddings as the central representation-level contribution.}
+\caption{Power comparisons on the MNIST pilot (left) and PathMNIST class-mixture alternative (right).}
 \label{fig:dechao-main-pilot-class-power}
 \end{figure}
 
 \begin{table}[H]
 \centering
-\caption{Representative PathMNIST rejection rates. The class-mixture null compares \texttt{mix635} with itself. Center-shift alternatives compare source-holdout and external images within the same tissue label.}
+\caption{Selected PathMNIST rejection rates. The matched null compares \texttt{mix635} with itself; center-shift alternatives compare source-holdout and external images within one label.}
 \label{tab:dechao-main-rejection}
 \scriptsize
-\setlength{\tabcolsep}{4.2pt}
-\resizebox{\textwidth}{!}{%
+\setlength{\tabcolsep}{3.6pt}
 \begin{tabular}{llrrrr}
 \toprule
-Task & Setting & Raw pixel & FC-128 & Multilayer single & Multilayer G15 \\
+Task & Setting & Raw & FC-128 & Multi-3 & Multi-15 \\
 \midrule
-Class mixture, \(n=90\) & H1 & 0.4966 & 0.7740 & 0.6254 & 0.7960 \\
-Class mixture, \(n=120\) & H1 & 0.6356 & 0.9628 & 0.7966 & 0.9588 \\
-Class mixture, \(n=120\) & matched H0 & 0.0330 & 0.0104 & 0.0144 & 0.0170 \\
-Label 6 center shift, \(n=50\) & H1 & 0.7816 & 0.7634 & 0.9912 & 0.9890 \\
-Label 8 center shift, \(n=50\) & H1 & 0.9600 & 0.9574 & 0.9852 & 0.9750 \\
-\bottomrule
-\end{tabular}}
-\end{table}
-
-For the class-mixture alternative, FC-128 and multilayer G15 were substantially more powerful than raw pixels at \(n=90\) and \(n=120\), while all matched-null rejection rates were below 0.05. The single-Gaussian multilayer representation did not uniformly improve on FC-128, indicating that adding representation levels is not automatically beneficial; performance depends on how the alternative is expressed in the learned feature space.
-
-We then considered a within-class source-vs-external comparison for labels 6 and 8. Here the tissue label was fixed, so the alternative represented center-associated variation rather than a change in class composition. At \(n=50\), multilayer representations were especially sensitive for label 6, whereas raw pixels and FC-128 were already highly sensitive for label 8. Some small-sample internal-null checks for multilayer G15 were mildly liberal. Center-shift rejection rates were therefore interpreted together with the corresponding source-internal and external-internal null rates. Detailed label-specific power curves and internal-null checks are shown in Figure~\ref{fig:app-dechao-center-results}.
-
-To examine where the center-shift signal appeared within FC-128, we decomposed the embedding using the frozen classifier head. Let \(h(x)\in\mathbb{R}^{128}\) denote FC-128 and let
-\[
-\ell(x)=Wh(x)+b
-\]
-be the classifier logits. Because softmax is invariant to a common shift of all logits, we centered the classifier weights across classes:
-\[
-H_C=I_C-\frac{1}{C}\mathbf{1}\mathbf{1}^{\top},
-\qquad
-W_c=H_CW.
-\]
-We then defined
-\[
-h_{\mathrm{sem}}(x)
-=
-P_{\operatorname{row}(W_c)}h(x),
-\qquad
-h_{\mathrm{res}}(x)
-=
-h(x)-h_{\mathrm{sem}}(x).
-\]
-The first component affects class-relative logits, whereas
-\[
-W_ch_{\mathrm{res}}(x)=0,
-\]
-so the residual component is not used by the final linear classifier. This decomposition was used as a diagnostic of the detected shift, rather than as a new classifier.
-
-\begin{table}[H]
-\centering
-\caption{Representative rejection rates from the centered semantic/residual decomposition.}
-\label{tab:dechao-semantic-residual}
-\scriptsize
-\setlength{\tabcolsep}{7pt}
-\begin{tabular}{lccc}
-\toprule
-Task & Logits & Semantic component & Residual component \\
-\midrule
-Class mixture, \(n=120\) & 0.9798 & 0.9582 & 0.9546 \\
-Label 6 center shift, \(n=50\) & 0.8578 & 0.8250 & 0.7504 \\
-Label 8 center shift, \(n=50\) & 0.8200 & 0.8400 & 0.9580 \\
+Class mixture, $n=120$ & H1 & 0.636 & 0.963 & 0.797 & 0.959 \\
+Class mixture, $n=120$ & H0 & 0.033 & 0.010 & 0.014 & 0.017 \\
+Label 6 center shift, $n=50$ & H1 & 0.782 & 0.763 & 0.991 & 0.989 \\
+Label 8 center shift, $n=50$ & H1 & 0.960 & 0.957 & 0.985 & 0.975 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-All three components detected the class-mixture alternative, with logits giving the largest rejection rate. Label 6 center shift was also more strongly detected by logits and the semantic component. In contrast, label 8 center shift was strongest in the residual component, with rejection rate 0.958 compared with 0.820 for logits and 0.840 for the semantic component.
+For the class-mixture alternative, FC-128 and the 15-component multilayer test were substantially more powerful than raw pixels, while the matched-null rates were below 0.05. The same-label source-vs-external experiment fixed the tissue class and therefore targeted center-associated variation rather than class composition. Multilayer features were especially sensitive for label 6, whereas raw pixels and FC-128 were already highly sensitive for label 8. Small-$n$ internal-null checks for the 15-component test were mildly liberal; the complete source-internal and external-internal checks appear in Appendix~\ref{app:dechao-cnn-mmmd}.
 
-Because the centered semantic subspace had rank at most eight, we checked whether the residual result was simply due to its larger effective dimension. At \(n=50\), reducing the label-8 residual representation to its leading eight principal components gave rejection rate 0.965, while an eight-dimensional random projection gave 0.8895; the full residual representation gave 0.975. A label-8-specific PCA sweep gave rejection rates 0.595, 0.925, and 0.960 for \(k=1,2,\) and \(4\) components, respectively. Thus most of the detectable residual shift was concentrated in a small number of directions. The dimension-matched and PCA-sweep diagnostics are shown in Figure~\ref{fig:app-dechao-residual-dimension}. An additional permutation calibration produced rejection rates similar to the multiplier-bootstrap analysis (Figure~\ref{fig:app-dechao-permutation-check}).
+To locate the signal within FC-128, let $h(x)\in\mathbb{R}^{128}$ and let the frozen classifier logits be $Wh(x)+b$. Since softmax is invariant to a common logit shift, we used centered weights $W_c=(I_C-C^{-1}\mathbf 1\mathbf 1^\top)W$ and defined
+\[
+h_{\mathrm{sem}}=P_{\operatorname{row}(W_c)}h,
+\qquad
+h_{\mathrm{res}}=h-h_{\mathrm{sem}}.
+\]
+The first component affects class-relative logits; the second satisfies $W_ch_{\mathrm{res}}=0$ and is ignored by the final linear head. At representative sample sizes, the class mixture gave rejection rates 0.980, 0.958, and 0.955 for logits, semantic, and residual features, respectively. Label 6 center shift gave 0.858, 0.825, and 0.750, whereas label 8 gave 0.820, 0.840, and 0.958. Thus the label-8 difference was strongest in residual coordinates.
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.94\textwidth]{figures/dechao_semantic_vs_residual_power.png}
-\caption{MMMD rejection rates for logits, centered semantic features, and residual features. All components detect the class-mixture alternative, whereas the label-8 center shift is strongest in residual coordinates.}
-\label{fig:dechao-semantic-residual-main}
-\end{figure}
+We checked whether this residual result was a dimensional artifact. The centered semantic subspace had rank at most eight; at $n=50$, the leading eight residual PCs, a random 8D residual projection, and the full residual representation gave rejection rates 0.965, 0.890, and 0.975. A label-8 PCA sweep reached 0.925 with two PCs and 0.960 with four PCs. We then assessed color/stain association using 15 RGB summaries (channel means, standard deviations, and 10th, 50th, and 90th percentiles). On held-out images these summaries explained 72.8\% of the top-eight residual source--external score, and score residualization reduced its AUC from 0.778 to 0.622. Color-only MMMD reached power 0.960 at $n=50$; after color-propensity matching, residual MMMD fell to 0.455, compared with a maximum matched-null rate of 0.110. Corresponding plots and matching diagnostics are provided in Appendix~\ref{app:dechao-cnn-mmmd}.
 
-We next examined whether the label-8 residual separation was associated with color or staining. A logistic classifier was first trained on residual features to distinguish source from external images, producing an out-of-sample source--external score. For each image, we also extracted 15 color summaries: the mean, standard deviation, and 10th, 50th, and 90th percentiles of each RGB channel. A separate regression was then fitted to predict the residual source--external score from these color summaries.
+Overall, CNN features improved power for the PathMNIST class-mixture alternative, while the same-label label-8 comparison revealed a low-dimensional residual shift that was strongly associated with color/staining rather than uniquely with morphology.
 
-On held-out images, the color summaries explained \(72.8\%\) of the variation in the top-eight residual score and \(53.4\%\) of the variation in the full-residual score. Removing the color-predicted component reduced the corresponding source--external AUCs from \(0.778\) to \(0.622\) and from \(0.869\) to \(0.737\) (Figure~\ref{fig:app-dechao-color-score}). In a separate two-sample analysis using only the 15 color summaries, MMMD power reached \(0.960\) at \(n=50\).
-
-Finally, source and external images were matched on a color-based propensity score before rerunning residual MMMD. After matching, rejection rates for both the top-eight and full residual representations fell to \(0.455\) at \(n=50\), while the maximum matched internal-null rejection rate was \(0.110\). Matching therefore removed a substantial fraction of the original residual separation, although the rejection rate remained above the internal-null reference (Figure~\ref{fig:app-dechao-color-mmmd}).
-
-Taken together, the experiments show that CNN representations can improve MMMD power for the PathMNIST class-mixture alternative, but the most informative representation depends on the alternative. For label 8, the within-class source-vs-external difference was concentrated in low-dimensional residual directions and was strongly associated with color and staining summaries. The result is therefore described as a color/stain-associated residual domain shift, rather than evidence of a purely morphological difference. Additional diagnostics are reported in Appendix~\ref{app:dechao-cnn-mmmd}.
-
+\endgroup
 
 \section{Beyond task-trained CNNs: frozen visual encoders and stabilized testing}
 
@@ -783,169 +728,238 @@ $p$ & MMMD-Mix & MMMD-Gauss & MMMD-LAP & MMD-Gauss \\
 Overall, these numerical extensions show that the Mahalanobis aggregation strategy generalizes well beyond the Gaussian mean-shift and variance-shift settings studied in the original paper. The multi-kernel advantage is most pronounced when the distributional difference is small relative to the noise, and the calibration properties are generally well-behaved provided the bandwidth count is kept moderate or the LAP family is used. The graph-based variant further demonstrates that the MMMD framework can accommodate non-Euclidean kernel constructions without compromising Type-I error control.
 
 \clearpage
-\section{Detailed CNN-MMMD component figures}
+\section{Detailed CNN-MMMD methods and diagnostics}
 \label{app:dechao-cnn-mmmd}
-\captionsetup[figure]{font=footnotesize,skip=4pt}
-\captionsetup[table]{font=footnotesize,skip=4pt}
+\captionsetup[figure]{font=small,skip=4pt}
+\captionsetup[table]{font=small,skip=4pt}
 
-This appendix collects the figures supporting Section~\ref{sec:cnn-mmmd}. Related panels are grouped so that each subsection corresponds to one step of the analysis: initial validation, PathMNIST power and calibration, same-label center shift, semantic/residual decomposition, and color/stain controls.
+This appendix documents the experimental design and calculations underlying Section~\ref{sec:cnn-mmmd}. It separates the main testing pipeline from the later diagnostic analyses so that the source of each reported number is explicit.
 
-\subsection{Evidence map and run sizes}
+\subsection{Data separation, run sizes, and leakage control}
 
-Formal PathMNIST power and internal-null analyses used 10 outer repetitions, 500 independent tests per repetition, and 500 multiplier-bootstrap draws. The smaller mechanism and robustness experiments used the run sizes reported in their respective result files.
+For MNIST, the CNN was trained on the training split and all MMMD evaluations used held-out images. For PathMNIST, the official training split (the source domain) was divided stratifiably into a CNN-training pool and a source-holdout pool. The CNN was trained on all nine tissue labels using only the CNN-training pool; the official validation split was used for checkpoint selection. The source-holdout pool and the official test split (the external domain) were reserved for two-sample testing. Thus neither group in the formal source-vs-external test was used to fit the CNN.
+
+Formal PathMNIST power and internal-null analyses used 10 outer repetitions, 500 independent tests per outer repetition, and 500 multiplier-bootstrap draws per test, giving 5000 tests per method and sample-size cell. The semantic/residual robustness and label-8 dissection experiments used 10 outer repetitions, 20 inner tests, and 500 bootstrap draws; linear domain-axis analyses were repeated 20 times over train/holdout splits. Sampling was without replacement within a test, although different repeated tests could reuse observations.
 
 \begin{table}[H]
 \centering
-\caption{Role of each experimental stage in the CNN-MMMD analysis.}
+\caption{Questions addressed by the CNN-MMMD experimental sequence.}
 \label{tab:app-dechao-ledger}
-\scriptsize
+\small
 \setlength{\tabcolsep}{5pt}
 \begin{tabular}{>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.69\textwidth}}
 \toprule
-Stage & Purpose and evidence \\
+Stage & Experimental role \\
 \midrule
-MNIST validation & Compare raw pixels, FC-128, and multilayer representations across additive-noise levels, with matched-null Type-I checks. \\
-PathMNIST class mixture & Measure power for \texttt{mix635} versus \texttt{mix835} and verify calibration with a matched \texttt{mix635} null. \\
-Same-label center shift & Compare source-holdout and external images within labels 6 and 8, with source-internal and external-internal null checks. \\
-Semantic/residual analysis & Decompose FC-128 into classifier-used and classifier-ignored components and compare their rejection rates. \\
-Residual robustness & Match the effective dimension of the semantic and residual spaces, vary residual PCA dimension, and compare bootstrap with permutation calibration. \\
-Color/stain controls & Explain the residual source--external score with RGB summaries, run color-only MMMD, and repeat residual MMMD after color matching. \\
+MNIST validation & Compare raw pixels and CNN representations under additive noise and verify matched-null rejection. \\
+PathMNIST class mixture & Test a controlled tissue-composition alternative, \texttt{mix635} versus \texttt{mix835}, with a matched \texttt{mix635} null. \\
+Same-label center shift & Compare source-holdout and external images within labels 6 and 8, together with source-internal and external-internal nulls. \\
+Semantic/residual analysis & Separate FC-128 directions used by the classifier from its orthogonal residual complement. \\
+Residual robustness & Match effective dimension, vary residual PCA dimension, and check bootstrap sensitivity. \\
+Color/stain analyses & Explain the residual domain score with RGB summaries, test color summaries directly, and rerun residual MMMD after color matching. \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+\subsection{CNN features and MMMD variants}
+
+The PathMNIST network used two convolutional blocks followed by global average pooling, a 128-dimensional fully connected layer, and a nine-class linear classifier. The extracted features were a 32-dimensional shallow pooled feature, a 64-dimensional intermediate pooled feature, and the 128-dimensional penultimate feature (FC-128). Raw 28-by-28 RGB images gave 2352 pixel coordinates.
+
+Four principal tests were compared. Raw-pixel Gaussian-5 and FC-128 Gaussian-5 each used five Gaussian bandwidths. The multilayer single-Gaussian test used one Gaussian kernel on each of the three CNN feature levels, producing three MMD components. Multilayer Gaussian-15 used five bandwidths at each feature level, producing 15 components. The same sampled image indices were used across representations within a repeated test. All component vectors were combined by the MMMD statistic in Section~2.
+
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.86\textwidth]{figures/dechao_mnist_cnn_power.png}\\[-2pt]
+\includegraphics[width=0.82\textwidth]{figures/dechao_mnist_cnn_power}\\[-2pt]
 \textbf{(a)} Power across additive-noise levels
-\caption{MNIST additive-noise power. Abbreviations: Raw, raw pixels; L1, first CNN layer; L2, second CNN layer; FC, FC-128 final embedding; ML-S, multilayer single-Gaussian aggregation; ML-G15, multilayer Gaussian-15 aggregation.}
-\label{fig:app-dechao-mnist-power}
-\end{figure}
 
-\subsection{MNIST validation}
-
-MNIST was used as a controlled image benchmark before moving to biomedical patches. The CNN was trained on the MNIST training split, frozen, and evaluated through MMMD on held-out images.
-
-\begin{figure}[H]
-\centering
-\begin{minipage}[t]{0.43\textwidth}
+\vspace{6pt}
+\begin{minipage}[t]{0.47\textwidth}
 \centering
 \includegraphics[width=\linewidth]{figures/dechao_mnist_type1_set123.png}\\[-2pt]
 \textbf{(b)} Matched null: \texttt{set123}
 \end{minipage}\hfill
-\begin{minipage}[t]{0.43\textwidth}
+\begin{minipage}[t]{0.47\textwidth}
 \centering
 \includegraphics[width=\linewidth]{figures/dechao_mnist_type1_set128.png}\\[-2pt]
 \textbf{(c)} Matched null: \texttt{set128}
 \end{minipage}
-\caption{MNIST matched-null validation. Panels (b) and (c) show H0 rejection rates for \texttt{set123} and \texttt{set128} relative to the nominal 0.05 level.}
+\caption{MNIST validation of the representation-assisted MMMD pipeline.}
 \label{fig:app-dechao-mnist-validation}
 \end{figure}
 
-\subsection{PathMNIST class-mixture power and calibration}
+\subsection{PathMNIST alternatives and internal-null checks}
 
-The class-mixture experiment compares \texttt{mix635} with \texttt{mix835}; the matched null compares \texttt{mix635} with itself.
+The class-mixture alternative compared observations drawn from labels $\{6,3,5\}$ with observations drawn from labels $\{8,3,5\}$ using the project mixture sampler. The matched null compared two independently sampled \texttt{mix635} groups. The main sample-size grid was $n\in\{30,60,90,120,150\}$ per group.
 
-\begin{center}
-\includegraphics[width=0.80\textwidth]{figures/dechao_pathmnist_class_mixture_power.png}\\[-2pt]
-\textbf{(a)} Class-mixture power
-\end{center}
+For center shift and a fixed tissue label $c\in\{6,8\}$, the alternative was
+\[
+X\sim \text{source-holdout}(c),\qquad Y\sim \text{external}(c).
+\]
+Two internal nulls were evaluated separately: both groups sampled from source-holdout$(c)$, and both groups sampled from external$(c)$. The center-shift grid was $n\in\{20,30,50,80,100\}$ where feasible. When a single conservative null reference is displayed, ``max $H_0$'' denotes the larger of the source-internal and external-internal rejection rates.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.80\textwidth]{figures/dechao_pathmnist_class_type1_zoom.png}\\[-2pt]
+\includegraphics[width=0.82\textwidth]{figures/dechao_pathmnist_class_mixture_power.png}\\[-2pt]
+\textbf{(a)} Class-mixture power
+
+\vspace{7pt}
+\includegraphics[width=0.82\textwidth]{figures/dechao_pathmnist_class_type1_zoom.png}\\[-2pt]
 \textbf{(b)} Matched-null Type-I error
-\caption{PathMNIST class-mixture results. CNN representations increase power for \texttt{mix635} versus \texttt{mix835}, while the matched-null rejection rates remain below 0.05.}
+\caption{PathMNIST class-mixture alternative and matched-null calibration.}
 \label{fig:app-dechao-path-class}
 \end{figure}
 
-\subsection{Same-label source-vs-external center shift}
-
-The center-shift experiment fixes the tissue label and compares source-holdout images with external-test images. The examples below illustrate visible source--external variation within the same label; the accompanying curves provide the corresponding power and internal-null checks.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/dechao_pathmnist_center_shift_examples.png}
+\caption{Same-label source and external PathMNIST images for labels 6 and 8.}
+\label{fig:app-dechao-center-examples}
+\end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.94\textwidth]{figures/dechao_pathmnist_examples_wide.png}
-\caption{PathMNIST examples used to motivate the same-label center-shift analysis. The left block shows representative tissue classes near the labels used in the experiments; the right block compares source and external images within labels 6 and 8.}
+\includegraphics[width=0.95\textwidth,trim=0 0 0 380,clip]{figures/dechao_pathmnist_examples.png}
+\caption{Representative tissue classes used in the center-shift analysis.}
 \label{fig:app-dechao-examples}
 \end{figure}
 
 \begin{center}
-\includegraphics[width=0.80\textwidth]{figures/dechao_center_shift_power_label6.png}\\[-2pt]
+\includegraphics[width=0.95\textwidth]{figures/dechao_center_shift_power_label6.png}\\[-2pt]
 \textbf{(a)} Label 6 power
+
+\vspace{7pt}
+\includegraphics[width=0.95\textwidth]{figures/dechao_center_shift_power_label8.png}\\[-2pt]
+\textbf{(b)} Label 8 power
 \end{center}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.80\textwidth]{figures/dechao_center_shift_power_label8.png}\\[-2pt]
-\textbf{(b)} Label 8 power
-
-\vspace{4pt}
-\includegraphics[width=0.92\textwidth]{figures/dechao_pathmnist_center_shift_type1.png}\\[-2pt]
+\includegraphics[width=0.95\textwidth]{figures/dechao_pathmnist_center_shift_type1.png}\\[-2pt]
 \textbf{(c)} Source-internal and external-internal null checks
-\caption{Same-label PathMNIST center-shift results. Panels (a) and (b) show source-vs-external rejection rates; panel (c) gives the internal-null calibration reference, including the small-sample inflation of multilayer Gaussian-15.}
+\caption{Same-label source-vs-external power and the corresponding internal-null references.}
 \label{fig:app-dechao-center-results}
 \end{figure}
 
-\subsection{Semantic/residual decomposition and dimensionality checks}
+\subsection{Centered semantic/residual decomposition}
 
-The FC-128 decomposition compares classifier logits, the centered classifier row-space projection, and its residual complement. The label-8 analysis then checks whether residual dominance survives dimension matching and how many residual principal components are needed.
+Let $h_i\in\mathbb{R}^{128}$ be the FC-128 embedding and let the frozen classifier produce logits $Wh_i+b$, where $W\in\mathbb{R}^{9\times128}$. Softmax is invariant to adding the same constant to all nine logits, so the class-discriminative weight matrix was centered across classes:
+\[
+H_C=I_C-\frac{1}{C}\mathbf 1\mathbf 1^\top,\qquad W_c=H_CW=W-\mathbf 1\bar w^\top.
+\]
+The dimensions of $W$ and $W_c$ are both $9\times128$, but the rows of $W_c$ sum to zero and its rank is at most $C-1=8$. An orthonormal basis $V$ for $\operatorname{row}(W_c)$ was obtained by singular-value decomposition. The two components were
+\[
+h_{i,\mathrm{sem}}=VV^\top h_i,\qquad h_{i,\mathrm{res}}=h_i-h_{i,\mathrm{sem}}.
+\]
+Numerically, $W_ch_{i,\mathrm{res}}$ was zero up to floating-point tolerance. MMMD was then run separately on centered logits, $h_{\mathrm{sem}}$, $h_{\mathrm{res}}$, and the full embedding. No network parameters were changed during this analysis.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.88\textwidth]{figures/dechao_semantic_vs_residual_power.png}
-\caption{Semantic/residual MMMD readout across the main PathMNIST tasks. Label-8 source-vs-external center shift is strongest in the residual component.}
+\caption{MMMD rejection rates for classifier logits, centered semantic features, and residual features.}
 \label{fig:app-dechao-semres-power}
 \end{figure}
+
+\subsection{Dimension matching, residual PCA, and calibration sensitivity}
+
+Although $h_{\mathrm{sem}}$ and $h_{\mathrm{res}}$ are both stored as 128-dimensional vectors, their effective dimensions differ: $h_{\mathrm{sem}}$ lies in a rank-8 subspace, whereas the residual complement can contain roughly 120 directions. The dimension-matched control therefore projected residual features to eight dimensions in two ways. First, PCA was fitted on the pooled residual feature pool without using source/external labels and the leading eight scores were retained. Second, random orthonormal 8D projections were generated repeatedly; the reported random-8 result averages over 20 projections.
+
+A separate intrinsic-dimension analysis used a label-8-specific PCA basis and retained $k\in\{1,2,4,8,16,32\}$ components. Consequently, the 8D value in the dimension-matched control (0.965) and the $k=8$ value in the intrinsic-dimension curve (0.970) use different PCA bases and independent repeated tests. The difference of 0.005 corresponds to one rejection among 200 tests. Multiplier bootstrap remained the primary calibration; permutation cutoffs were computed only as a sensitivity check in selected cells.
 
 \begin{figure}[H]
 \centering
 \begin{minipage}[t]{0.49\textwidth}
 \centering
 \includegraphics[width=\linewidth]{figures/dechao_label8_residual_dimension_matched.png}\\[-2pt]
-\textbf{(a)} Dimension-matched comparison at \(n=50\)
+\textbf{(a)} Dimension-matched comparison at $n=50$
 \end{minipage}\hfill
 \begin{minipage}[t]{0.49\textwidth}
 \centering
 \includegraphics[width=\linewidth]{figures/dechao_label8_residual_pca_dimension.png}\\[-2pt]
 \textbf{(b)} Label-8-specific residual PCA sweep
 \end{minipage}
-\caption{Residual dimensionality checks. Panel (a) compares the rank-8 semantic space with 8D residual projections; panel (b) shows that two to four residual principal components capture most of the label-8 signal.}
+\caption{Residual dimension controls. The residual signal persists at eight dimensions and is largely captured by the first two to four label-8-specific PCs.}
 \label{fig:app-dechao-residual-dimension}
 \end{figure}
 
-\begin{center}
-\includegraphics[width=0.80\textwidth]{figures/dechao_permutation_bootstrap_label6.png}\\[-2pt]
-\textbf{(a)} Label 6
-\end{center}
-
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.80\textwidth]{figures/dechao_permutation_bootstrap_label8.png}\\[-2pt]
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dechao_permutation_bootstrap_label6.png}\\[-2pt]
+\textbf{(a)} Label 6
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dechao_permutation_bootstrap_label8.png}\\[-2pt]
 \textbf{(b)} Label 8
-\caption{Multiplier-bootstrap and permutation calibration sensitivity check. This diagnostic used fewer inner tests than the formal PathMNIST power analysis.}
+\end{minipage}
+\caption{Sensitivity comparison between multiplier-bootstrap and permutation calibration.}
 \label{fig:app-dechao-permutation-check}
 \end{figure}
 
-\subsection{Color/stain explanation}
+\subsection{Two-stage explanation of the residual domain score}
+\label{app:dechao-color-score-method}
 
-The color analyses use 15 RGB summaries per image: the mean, standard deviation, and 10th, 50th, and 90th percentiles of each channel. The first pair of panels asks how much these summaries explain the residual source--external score; the later panels show direct two-sample and matching analyses.
+This analysis used a train/holdout split and two fitted models. It was performed separately for the full residual feature and the top-eight residual PCA feature.
+
+\paragraph{Stage 1: residual features to a domain score.}
+On the training split, a logistic regression classified source ($D_i=0$) versus external ($D_i=1$) from residual feature $r_i$:
+\[
+\Pr(D_i=1\mid r_i)=\operatorname{logit}^{-1}(\beta_0+\beta^\top r_i).
+\]
+The continuous pre-sigmoid decision value
+\[
+s_i=\beta_0+\beta^\top r_i
+\]
+was called the residual source--external score. The fitted logistic model was then applied unchanged to holdout residual features to obtain out-of-sample scores. This score is not a tissue-class logit and is not treated as a biological outcome; it is a one-dimensional summary of the domain-separating direction learned from residual features.
+
+\paragraph{Stage 2: color summaries to the residual score.}
+For each image, a 15-dimensional color vector $c_i$ was extracted. For each of the red, green, and blue channels, the features were the pixel mean, pixel standard deviation, and the 10th, 50th, and 90th percentiles. Thus
+\[
+c_i=(\mu_R,\mu_G,\mu_B,\sigma_R,\sigma_G,\sigma_B,
+q_{R,.1},q_{R,.5},q_{R,.9},q_{G,.1},q_{G,.5},q_{G,.9},q_{B,.1},q_{B,.5},q_{B,.9}).
+\]
+A linear regression was fitted on the training split,
+\[
+s_i=\alpha_0+\alpha^\top c_i+\varepsilon_i,
+\]
+and then applied unchanged to holdout color features. Holdout $R^2$ measured how much out-of-sample variation in the residual domain score could be predicted from color summaries.
 
 \begin{figure}[H]
 \centering
 \begin{minipage}[t]{0.49\textwidth}
 \centering
 \includegraphics[width=\linewidth]{figures/dechao_color_score_r2.png}\\[-2pt]
-\textbf{(a)} Holdout \(R^2\) for the residual score
+\textbf{(a)} Holdout $R^2$ for the residual score
 \end{minipage}\hfill
 \begin{minipage}[t]{0.49\textwidth}
 \centering
 \includegraphics[width=\linewidth]{figures/dechao_color_score_auc_drop.png}\\[-2pt]
-\textbf{(b)} AUC before and after color residualization
+\textbf{(b)} AUROC before and after color-score residualization
 \end{minipage}
-\caption{Color summaries explain a substantial part of the label-8 residual source--external score. Removing the color-predicted component reduces held-out domain separability.}
+\caption{Two-stage color explanation. Color summaries predict a substantial fraction of the residual source--external score, and removing that predicted component reduces held-out domain separability.}
 \label{fig:app-dechao-color-score}
 \end{figure}
+
+
+For score residualization, the holdout color prediction $\widehat s_{i,\mathrm{color}}$ was subtracted from the holdout residual score:
+\[
+s_{i,\mathrm{adj}}=s_i-\widehat s_{i,\mathrm{color}}.
+\]
+AUROC was calculated against the source/external labels using $s_i$ before adjustment and $s_{i,\mathrm{adj}}$ after adjustment. AUC depends on the ranking of scores, not their absolute magnitude; subtracting a common constant would leave AUC unchanged. The observed AUC reduction therefore reflects removal of a sample-specific color-associated component. Both the logistic and linear models were fitted only on the training split, and all reported $R^2$ and AUC values were computed on holdout images.
+
+\subsection{Color-only MMMD and color-propensity matching}
+\label{app:dechao-color-matching-method}
+
+The color-only analysis used the 15-dimensional vectors $c_i$ directly as MMMD inputs. The alternative compared label-8 source and external color vectors; source-internal and external-internal tests provided null references. Thus this experiment asked whether simple RGB summaries alone were sufficient to detect the domain difference.
+
+For matching, a separate logistic propensity model was fitted using color summaries:
+\[
+p_i=\Pr(D_i=1\mid c_i),\qquad \eta_i=\log\frac{p_i}{1-p_i}.
+\]
+Source and external images were paired by nearest propensity logit $\eta_i$ under the implementation's caliper. The procedure retained 846 source--external pairs, with mean absolute within-pair logit gap 0.009. Pairing was used only to select color-balanced cohorts: after matching, all selected source observations were pooled into one group and all selected external observations into the other, and residual MMMD was applied to these two groups. It was not a paired-sample MMMD statistic.
+
+The matched alternative sampled one group from the matched source cohort and one from the matched external cohort. Matched $H_0$-source and $H_0$-external were formed by drawing both groups from the same matched cohort. The displayed ``max matched $H_0$'' is the larger of these two internal-null rejection rates. Matching targets between-group color balance; it does not force either matched cohort to become internally homogeneous. The matched color-only AUC was 0.632, so residual color imbalance remained and the matched analysis should not be interpreted as perfect color randomization.
 
 \begin{figure}[H]
 \centering
@@ -959,9 +973,13 @@ The color analyses use 15 RGB summaries per image: the mean, standard deviation,
 \includegraphics[width=\linewidth]{figures/dechao_color_matched_summary_residual.png}\\[-2pt]
 \textbf{(b)} Residual MMMD after color-propensity matching
 \end{minipage}
-\caption{Direct color controls for label 8. Color summaries alone strongly distinguish source from external images; after matching the two groups on a color-based propensity score, residual rejection is substantially reduced and is interpreted relative to the matched internal-null reference.}
+\caption{Direct color controls for label 8. Color summaries alone distinguish source and external images; after color matching, residual rejection is substantially reduced and is compared with the matched internal-null reference.}
 \label{fig:app-dechao-color-mmmd}
 \end{figure}
+
+\subsection{Scope of the image-level inference}
+
+All PathMNIST analyses are patch-level comparisons. Patient, slide, and scanner identifiers were not available in the packaged data used here, so the repeated-sampling calculations treat image patches as the observational units. Center-shift rejection therefore establishes a difference between the source and external patch distributions; it does not by itself identify a causal center effect or a patient-level biological difference. Likewise, color-score regression and propensity matching are diagnostic adjustments for measured RGB summaries, not a complete stain-normalization or causal mediation analysis.
 
 \clearpage
 \section{Detailed representation experiment tables and figures}
