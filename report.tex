@@ -751,7 +751,7 @@ Formal PathMNIST power and internal-null analyses used 10 outer repetitions, 500
 \toprule
 Stage & Experimental role \\
 \midrule
-MNIST validation & Compare raw pixels and CNN representations under additive noise and verify matched-null rejection. \\
+MNIST validation & Compare raw pixels and CNN representations under additive noise and check matched-null calibration. \\
 PathMNIST class mixture & Test a controlled tissue-composition alternative, \texttt{mix635} versus \texttt{mix835}, with a matched \texttt{mix635} null. \\
 Same-label center shift & Compare source-holdout and external images within labels 6 and 8, together with source-internal and external-internal nulls. \\
 Semantic/residual analysis & Separate FC-128 directions used by the classifier from its orthogonal residual complement. \\
@@ -763,7 +763,7 @@ Color/stain analyses & Explain the residual domain score with RGB summaries, tes
 
 \subsection{CNN features and MMMD variants}
 
-The PathMNIST network used two convolutional blocks followed by global average pooling, a 128-dimensional fully connected layer, and a nine-class linear classifier. The extracted features were a 32-dimensional shallow pooled feature, a 64-dimensional intermediate pooled feature, and the 128-dimensional penultimate feature (FC-128). Raw 28-by-28 RGB images gave 2352 pixel coordinates.
+The CNN feature hierarchy used in these image experiments came from two convolutional blocks followed by global average pooling, a 128-dimensional fully connected layer, and a final linear classifier. The extracted features were a 32-dimensional shallow pooled feature, a 64-dimensional intermediate pooled feature, and the 128-dimensional penultimate feature (FC-128). Raw 28-by-28 RGB images gave 2352 pixel coordinates in the PathMNIST experiments.
 
 Four principal tests were compared. Raw-pixel Gaussian-5 and FC-128 Gaussian-5 each used five Gaussian bandwidths. The multilayer single-Gaussian test used one Gaussian kernel on each of the three CNN feature levels, producing three MMD components. Multilayer Gaussian-15 used five bandwidths at each feature level, producing 15 components. The same sampled image indices were used across representations within a repeated test. All component vectors were combined by the MMMD statistic in Section~2.
 
@@ -773,17 +773,10 @@ Four principal tests were compared. Raw-pixel Gaussian-5 and FC-128 Gaussian-5 e
 \textbf{(a)} Power across additive-noise levels
 
 \vspace{6pt}
-\begin{minipage}[t]{0.47\textwidth}
 \centering
-\includegraphics[width=\linewidth]{figures/dechao_mnist_type1_set123.png}\\[-2pt]
-\textbf{(b)} Matched null: \texttt{set123}
-\end{minipage}\hfill
-\begin{minipage}[t]{0.47\textwidth}
-\centering
-\includegraphics[width=\linewidth]{figures/dechao_mnist_type1_set128.png}\\[-2pt]
-\textbf{(c)} Matched null: \texttt{set128}
-\end{minipage}
-\caption{MNIST validation of the representation-assisted MMMD pipeline.}
+\includegraphics[width=0.82\textwidth]{figures/dechao_mnist_type1_all_methods.png}\\[-2pt]
+\textbf{(b)} Matched-null Type-I error for \texttt{set123} vs \texttt{set123}
+\caption{MNIST validation of the representation-assisted MMMD pipeline. In panel (a), L1 and L2 denote single-layer Gaussian-5 tests on the shallow and intermediate CNN features. In panel (b), Raw-G5 denotes raw-pixel Gaussian-5, FC-G5 denotes FC-128 Gaussian-5, ML-S denotes multilayer single-Gaussian, and ML-G15 denotes multilayer Gaussian-15. The dashed line marks the nominal $\alpha=0.05$ level.}
 \label{fig:app-dechao-mnist-validation}
 \end{figure}
 
