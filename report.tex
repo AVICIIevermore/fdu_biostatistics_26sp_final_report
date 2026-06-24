@@ -66,7 +66,7 @@
 \setlength{\textfloatsep}{5pt}
 \vspace{-1.0em}
 \begin{abstract}
-We review Mahalanobis aggregated maximum mean discrepancy (MMMD), a kernel two-sample test that combines correlated MMD statistics rather than selecting one bandwidth. The group reproduced the original testing framework and studied extensions involving covariance stabilization, alternative kernel constructions, and image representations. Across MNIST and biomedical image datasets, power depended on both the testing statistic and the feature space; the later sections therefore report power together with matched-null calibration and numerical diagnostics.
+We review Mahalanobis aggregated maximum mean discrepancy (MMMD), a kernel two-sample test that combines correlated MMD statistics rather than selecting one bandwidth. The group reproduced the original testing framework and studied extensions involving covariance stabilization, alternative kernel constructions, and image representations. Across MNIST and biomedical image datasets, power depended on both the testing statistic and the feature space; the later sections therefore report power together with matched-null calibration and numerical diagnostics. Member contributions are Ruijie Li (Section~3, Appendix~A), Ziheng Zheng (Section~4, Appendix~B), Dechao Huang (Section~5, Appendix~C), and Yao Yu (Section~6, Appendix~D).
 \end{abstract}
 \small
 \section{Background and motivation}
@@ -811,16 +811,16 @@ Two internal nulls were evaluated separately: both groups sampled from source-ho
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.95\textwidth]{figures/dechao_pathmnist_center_shift_examples.png}
-\caption{Same-label source and external PathMNIST images for labels 6 and 8.}
-\label{fig:app-dechao-center-examples}
+\includegraphics[width=0.95\textwidth,trim=0 0 0 380,clip]{figures/dechao_pathmnist_examples.png}
+\caption{Representative tissue classes used in the center-shift analysis.}
+\label{fig:app-dechao-examples}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.95\textwidth,trim=0 0 0 380,clip]{figures/dechao_pathmnist_examples.png}
-\caption{Representative tissue classes used in the center-shift analysis.}
-\label{fig:app-dechao-examples}
+\includegraphics[width=0.95\textwidth]{figures/dechao_pathmnist_center_shift_examples.png}
+\caption{Same-label source and external PathMNIST images for labels 6 and 8.}
+\label{fig:app-dechao-center-examples}
 \end{figure}
 
 \begin{center}
